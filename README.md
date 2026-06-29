@@ -26,9 +26,13 @@ rbac/             RBAC manifests (ClusterRole, ClusterPermission)
 ## Local Preview
 
 ```bash
-cd content
-podman run --rm --name antora -v $PWD:/antora:z -p 8080:8080 -i -t \
-  ghcr.io/juliaaano/antora-viewer
+# Using the included utilities (recommended)
+./utilities/lab-build    # build the site
+./utilities/lab-serve    # serve at http://localhost:8080
+./utilities/lab-stop     # stop the server
+
+# Or using podman-compose
+podman-compose up
 ```
 
 Open http://localhost:8080

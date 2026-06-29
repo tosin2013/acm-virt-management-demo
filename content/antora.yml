@@ -1,11 +1,14 @@
-name: acm-virt-management-demo
+name: modules
 title: "ACM Virtual Machine Management Demo"
-version: "1.0"
-start_page: ROOT:00-index.adoc
+version: master
 nav:
   - modules/ROOT/nav.adoc
+
 asciidoc:
   attributes:
+    lab_name: "ACM Virtual Machine Management Demo"
+    release-version: master
+    page-pagination: true
     openshift_cluster_ingress_domain: "apps.cluster.sandbox3008.opentlc.com"
     acm_hub_console: "https://console-openshift-console.apps.cluster.sandbox3008.opentlc.com"
     grafana_url: "https://grafana-open-cluster-management-observability.apps.cluster.sandbox3008.opentlc.com"
@@ -13,3 +16,8 @@ asciidoc:
     guid: "sandbox3008"
     user: "admin"
     password: "PROVIDED_AT_RUNTIME"
+    page-links:
+    - url: https://github.com/tosin2013/acm-virt-management-demo
+      text: GitHub Repository
+    - url: https://access.redhat.com/documentation/en-us/red_hat_advanced_cluster_management_for_kubernetes/2.16
+      text: RHACM 2.16 Docs
