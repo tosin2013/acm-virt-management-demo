@@ -1,0 +1,44 @@
+= How to Use This Demo Guide
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+This guide helps solution architects and technical presenters deliver an effective demonstration of *Red Hat Advanced Cluster Management* (RHACM) with *OpenShift Virtualization* to customers evaluating multicluster governance for hybrid VM and container workloads.
+
+Every demo is different and you will adapt this guide to your specific audience.
+If you have less than the noted amount of time, you can skip modules or focus on the ones most relevant to the customer's priorities.
+
+The following sections explain how the guide is organized.
+
+== Demo Overview
+The *Demo Overview* section provides the business context: why organizations need unified governance across VMs and containers, and how RHACM addresses this.
+
+IMPORTANT: Read this section thoroughly before presenting. Understand the business narrative -- you are not just showing features, you are telling a transformation story.
+
+== Demo Details
+The *Demo Details* section is your single reference for:
+
+* Proposed timing for each module
+* Products and versions
+* Environment credentials
+* Troubleshooting common issues
+* Architecture diagrams
+
+== Demo Modules
+This demo contains six modules, each covering a requirement from the ACM Deep-Dive Session.
+Every module uses the *Know* and *Show* structure:
+
+=== Know
+Content in the *Know* section provides context, business value, and background.
+It describes _what_ you will show and _why_ it matters.
+It is not a script -- make sure you understand the "what" and "why" before presenting.
+
+=== Show
+Content in the *Show* section gives step-by-step instructions.
+Commands are formatted for click-to-execute where available.
+Follow the steps in order unless otherwise noted.
+
+== Next Steps
+Start by reading the *Demo Overview*!

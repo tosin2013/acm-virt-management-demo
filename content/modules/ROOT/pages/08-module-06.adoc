@@ -1,0 +1,185 @@
+= Module 6: Eradicate Cluster Destruction
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+== Part 1 -- Why Cluster Destruction Prevention Matters
+
+=== Know
+
+_The most catastrophic risk in a hub-and-spoke architecture is the destruction of managed clusters from the Hub. A compromised credential, a fat-fingered CLI command, or a rogue insider with the `delete` verb on `managedclusters` can take down production workloads across an entire region in seconds._
+
+**Business Challenge:**
+The default `open-cluster-management:cluster-manager-admin` role grants `create`, `read`, `update`, and `delete` on all cluster lifecycle resources. This is the equivalent of giving every building manager a demolition permit -- technically correct, but operationally catastrophic.
+
+**Technical Solution:**
+This module deploys a custom `rhacm-nondestructive-operator` ClusterRole that explicitly omits the `delete` verb for all cluster lifecycle API groups:
+
+[cols="1,1,1", options="header"]
+|===
+| API Resource | Standard Admin Verbs | Non-Destructive Verbs
+
+| `managedclusters`
+| get, list, watch, create, update, delete
+| get, list, watch, update, patch
+
+| `clusterdeployments`
+| get, list, watch, create, update, delete
+| get, list, watch, update, patch
+
+| `clusterclaims` / `clusterpools`
+| get, list, watch, create, update, delete
+| get, list, watch, update, patch
+
+| `managedclustersets`
+| get, list, watch, create, update, delete
+| get, list, watch, update, patch
+
+| `managedclustersetbindings`
+| get, list, watch, create, update, delete
+| get, list, watch, update, patch
+|===
+
+**Business Value:**
+
+* *Architectural impossibility* -- cluster destruction is not just "discouraged" or "audited" -- it is cryptographically denied by the Kubernetes API server
+* *Compliance alignment* -- satisfies DISA STIG, NIST, and HIPAA requirements for destructive action controls
+* *Operational safety* -- operators can still observe, update, and manage clusters -- only destruction is removed
+* *Zero-trust posture* -- even a fully compromised Hub account cannot destroy the fleet
+
+=== Show
+
+* Review the custom ClusterRole manifest:
++
+[source,role="execute"]
+----
+cat rbac/rhacm-nondestructive-operator-clusterrole.yaml
+----
+
+* Note the key design decisions:
+** `get`, `list`, `watch`, `update`, `patch` are permitted -- full operational capability
+** `delete` and `create` are omitted for cluster lifecycle resources -- no destruction, no unauthorized provisioning
+** Policy and application resources retain `create` -- operators can still deploy governance and workloads
+
+== Part 2 -- Applying the Non-Destructive Role
+
+=== Know
+
+_The custom ClusterRole replaces the default superset roles for day-to-day operations. By binding operators to `rhacm-nondestructive-operator` instead of `cluster-manager-admin`, the organization eliminates the single most dangerous permission in the entire RHACM stack._
+
+=== Show
+
+* Apply the non-destructive ClusterRole and binding:
++
+[source,role="execute"]
+----
+oc apply -f rbac/rhacm-nondestructive-operator-clusterrole.yaml
+----
+
+* Verify the ClusterRole was created:
++
+[source,role="execute"]
+----
+oc get clusterrole rhacm-nondestructive-operator -o yaml
+----
+
+* Verify the binding:
++
+[source,role="execute"]
+----
+oc get clusterrolebinding rhacm-nondestructive-operator-binding -o yaml
+----
+
+* Confirm the demo-operator user has the expected permissions:
++
+[source,role="execute"]
+----
+oc auth can-i list managedclusters --as=demo-operator
+----
++
+Expected output: `yes`
+
++
+[source,role="execute"]
+----
+oc auth can-i update managedclusters --as=demo-operator
+----
++
+Expected output: `yes`
+
+== Part 3 -- The Destruction Test
+
+=== Know
+
+_This is the most impactful moment of the entire demo. The operator attempts to destroy a managed cluster -- and the Kubernetes API server denies the request with a `Forbidden` error. This proves that the protection is not a UI guardrail or a policy warning -- it is an architectural constraint enforced at the API level._
+
+=== Show
+
+* **CLI Test** -- Attempt to delete a managed cluster:
++
+[source,role="execute"]
+----
+oc delete managedcluster managed-cluster-01 --as=demo-operator --dry-run=server
+----
++
+Expected output:
++
+----
+Error from server (Forbidden): managedclusters.cluster.open-cluster-management.io "managed-cluster-01" is forbidden: User "demo-operator" cannot delete resource "managedclusters" in API group "cluster.open-cluster-management.io" at the cluster scope
+----
+
+* **Hive Test** -- Attempt to delete a ClusterDeployment:
++
+[source,role="execute"]
+----
+oc delete clusterdeployment managed-cluster-01 -n managed-cluster-01 --as=demo-operator --dry-run=server
+----
++
+Expected output: `Error from server (Forbidden)`
+
+* **ClusterPool Test** -- Attempt to delete a ClusterPool:
++
+[source,role="execute"]
+----
+oc delete clusterpool demo-pool -n hive --as=demo-operator --dry-run=server
+----
++
+Expected output: `Error from server (Forbidden)`
+
+* **ManagedClusterSet Test** -- Attempt to delete a ManagedClusterSet:
++
+[source,role="execute"]
+----
+oc delete managedclusterset production-clusters --as=demo-operator --dry-run=server
+----
++
+Expected output: `Error from server (Forbidden)`
+
+* **Positive verification** -- Confirm the user CAN still perform non-destructive operations:
++
+[source,role="execute"]
+----
+oc get managedclusters --as=demo-operator
+----
++
+[source,role="execute"]
+----
+oc label managedcluster managed-cluster-01 demo-verified=true --as=demo-operator --dry-run=server
+----
++
+Expected output: `managedcluster.cluster.open-cluster-management.io/managed-cluster-01 labeled (server dry run)`
+
+[IMPORTANT]
+====
+**Deliver this message to the customer:** "Your operator can see every cluster, update labels, manage policies, deploy applications, and observe the entire fleet. The one thing they cannot do is destroy it. That is not a UI warning -- that is the Kubernetes API server cryptographically denying the request. Even if this account is fully compromised, your fleet is safe."
+====
+
+== Key Takeaways
+
+* The `rhacm-nondestructive-operator` ClusterRole provides full operational capability minus destruction
+* The `delete` verb is omitted for all cluster lifecycle API groups: `managedclusters`, `clusterdeployments`, `clusterclaims`, `clusterpools`, `managedclustersets`, `managedclustersetbindings`
+* Protection is enforced at the Kubernetes API level -- not a UI guardrail or policy warning
+* Operators retain `get`, `list`, `watch`, `update`, `patch` -- only destruction is removed
+* This satisfies DISA STIG, NIST, HIPAA, and PCI-DSS requirements for destructive action controls

@@ -1,0 +1,153 @@
+= Module 4: Deploy Without Cluster-Admin
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+== Part 1 -- The Problem with Cluster-Admin
+
+=== Know
+
+_The traditional Kubernetes administrative model forces organizations into granting `cluster-admin` privileges to facilitate deployment and infrastructure scaling. This violates the principle of least privilege and introduces systemic risk -- a leaked credential or a rogue insider with cluster-admin can destroy the entire platform._
+
+**Business Challenge:**
+Development teams need to deploy VM workloads across multiple clusters. The path of least resistance is granting `cluster-admin` to everyone who needs to deploy. This creates:
+
+* *Audit blind spots* -- cluster-admin actions are broadly scoped and difficult to attribute
+* *Blast radius* -- a compromised cluster-admin credential can delete namespaces, drain nodes, or destroy the entire cluster
+* *Compliance violations* -- regulatory frameworks (NIST, PCI-DSS, HIPAA) require least-privilege access models
+
+**Technical Solution:**
+RHACM provides the `open-cluster-management:subscription-admin` ClusterRole that allows users to create Git Subscriptions deploying resources across multiple namespaces -- without granting `cluster-admin`.
+
+Combined with OpenShift GitOps (ArgoCD), the Git repository becomes the immutable single source of truth. Developers push to Git; ArgoCD syncs to clusters. No human ever runs `oc apply` directly against a production cluster.
+
+=== Show
+
+* Review the current RBAC setup -- note that the demo-deployer user does NOT have cluster-admin:
++
+[source,role="execute"]
+----
+oc auth can-i --list --as=demo-deployer | grep -E "cluster-admin|managedcluster"
+----
+
+* Apply the subscription-admin binding from the rbac/ directory:
++
+[source,role="execute"]
+----
+oc apply -f rbac/subscription-admin-binding.yaml
+----
+
+* Verify the binding was created:
++
+[source,role="execute"]
+----
+oc get clusterrolebinding gitops-subscription-admin -o yaml
+----
+
+== Part 2 -- Deploying Via Git Subscription
+
+=== Know
+
+_With `subscription-admin` bound, a user can create RHACM Subscriptions that deploy resources from a Git repository to any namespace across the fleet. The subscription model provides:_
+
+* *Declarative deployment* -- desired state is defined in Git, not in CLI commands
+* *Automatic sync* -- changes pushed to Git are automatically detected and applied
+* *Audit trail* -- every deployment change is a Git commit with author, timestamp, and diff
+* *Rollback capability* -- reverting a deployment is a Git revert
+
+This model eliminates the need for developers to have direct CLI access to managed clusters entirely.
+
+=== Show
+
+* Create a Channel resource pointing to the Git repository:
++
+[source,role="execute"]
+----
+cat <<EOF | oc apply -f -
+apiVersion: apps.open-cluster-management.io/v1
+kind: Channel
+metadata:
+  name: acm-virt-demo-channel
+  namespace: open-cluster-management-policies
+spec:
+  type: Git
+  pathname: https://github.com/tosin2013/acm-virt-management-demo.git
+EOF
+----
+
+* Create a Subscription that deploys VM workloads from the repository:
++
+[source,role="execute"]
+----
+cat <<EOF | oc apply -f -
+apiVersion: apps.open-cluster-management.io/v1
+kind: Subscription
+metadata:
+  name: vm-workload-subscription
+  namespace: vm-demo-app
+  annotations:
+    apps.open-cluster-management.io/git-path: policies/
+    apps.open-cluster-management.io/git-branch: main
+spec:
+  channel: open-cluster-management-policies/acm-virt-demo-channel
+  placement:
+    placementRef:
+      name: virt-enabled-clusters
+      kind: Placement
+EOF
+----
+
+* Verify the subscription is propagating to managed clusters:
++
+[source,role="execute"]
+----
+oc get subscription vm-workload-subscription -n vm-demo-app -o yaml | grep -A5 status
+----
+
+== Part 3 -- Proving Non-Admin Deployment Works
+
+=== Know
+
+_The most compelling demonstration is showing that the deployment succeeded while the deploying user cannot perform destructive actions. This proves that productivity and security are not mutually exclusive._
+
+=== Show
+
+* Verify the deployment was successful on the managed cluster -- the VM policies are applied:
++
+[source,role="execute"]
+----
+oc get policies -n open-cluster-management-policies
+----
+
+* Now prove that the same user cannot perform destructive cluster operations:
++
+[source,role="execute"]
+----
+oc auth can-i delete managedclusters --as=demo-deployer
+----
++
+Expected output: `no`
+
+* Attempt to delete a namespace as the demo-deployer:
++
+[source,role="execute"]
+----
+oc delete namespace openshift-monitoring --as=demo-deployer --dry-run=server
+----
++
+Expected output: `Error from server (Forbidden)`
+
+[IMPORTANT]
+====
+**Key message for the customer:** "This user just deployed VM governance policies across your entire fleet -- and they cannot delete a single namespace or cluster. Git is the single source of truth, not human CLI access."
+====
+
+== Key Takeaways
+
+* `subscription-admin` enables cross-namespace deployment without `cluster-admin`
+* Git becomes the immutable audit trail for all deployment changes
+* ArgoCD and RHACM Subscriptions provide automatic sync and drift correction
+* Developers never need direct CLI access to production clusters
+* Productivity and security are complementary, not competing concerns

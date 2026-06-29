@@ -1,0 +1,150 @@
+= Module 1: VM Policies and Governance
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+== Part 1 -- Declarative VM Governance with ACM Policies
+
+=== Know
+
+_Traditional VM management relies on manual runbooks and per-cluster configuration. A single missed patch or misconfigured backup schedule across 15 clusters can result in data loss or compliance violations. RHACM eliminates this risk by treating VM governance as code._
+
+**Business Challenge:**
+Organizations running hundreds of VMs across multiple OpenShift clusters have no centralized way to enforce configuration standards. Each cluster team applies policies independently, leading to drift, inconsistent backup schedules, and blind spots in resource utilization.
+
+**Technical Solution:**
+RHACM uses `ConfigurationPolicy` resources to wrap kubevirt.io objects in a declarative governance layer. The policy engine continuously monitors managed clusters and automatically remediates drift -- if a required configuration is deleted or modified, ACM recreates it within seconds.
+
+**Business Value:**
+
+* *Automated compliance* -- policies map directly to NIST SP 800-53 controls (CM-2, CP-9)
+* *Self-healing infrastructure* -- drift is corrected without human intervention
+* *Targeted enforcement* -- policies apply only to clusters labeled `virtualization-enabled: true`
+
+=== Show
+
+* Verify that the managed clusters are labeled for virtualization targeting:
++
+[source,role="execute"]
+----
+oc get managedclusters -l virtualization-enabled=true
+----
+
+* Review the Placement resource that targets virtualization-enabled clusters:
++
+[source,role="execute"]
+----
+oc get placement virt-enabled-clusters -n open-cluster-management-policies -o yaml
+----
+
+* Verify the PlacementDecision shows the expected clusters:
++
+[source,role="execute"]
+----
+oc get placementdecision -n open-cluster-management-policies -l cluster.open-cluster-management.io/placement=virt-enabled-clusters -o yaml
+----
+
+== Part 2 -- VM Right-Sizing Metrics Policy
+
+=== Know
+
+_Right-sizing VMs is one of the primary reasons organizations adopted traditional hypervisor tools like VMware DRS. RHACM brings this capability to Kubernetes-native VM management by deploying Prometheus recording rules that continuously track CPU and memory utilization ratios._
+
+The `vm-right-sizing-metrics` policy deploys two key components to every virtualization-enabled managed cluster:
+
+* *PrometheusRule* with recording rules that calculate `kubevirt:vm_cpu_usage_ratio` and `kubevirt:vm_memory_usage_ratio`
+* *Custom metrics allowlist* that ensures VM metrics are forwarded to the ACM Hub observability stack
+
+These metrics power the fleet-wide Grafana dashboards demonstrated in Module 2.
+
+=== Show
+
+* Apply the VM right-sizing policy:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-right-sizing-policy.yaml
+oc apply -f policies/placement-binding.yaml
+----
+
+* Navigate to the ACM console at {acm_hub_console}
+
+* Go to *Governance* → *Policies* and verify the `vm-right-sizing-metrics` policy shows *Compliant*
+
+* On a managed cluster, verify the PrometheusRule was created:
++
+[source,role="execute"]
+----
+oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o yaml
+----
+
+* Verify the recording rules are producing data:
++
+[source,role="execute"]
+----
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'kubevirt:vm_cpu_usage_ratio'
+----
+
+== Part 3 -- VM Backup Enforcement Policy
+
+=== Know
+
+_Business continuity for VM workloads requires automated, verified backups. The `vm-backup-enforcement` policy ensures that every virtualization-enabled cluster has OADP (OpenShift API for Data Protection) installed and a daily backup schedule configured for critical VM namespaces._
+
+The policy enforces three layers of backup infrastructure:
+
+1. *OADP Operator subscription* -- ensures the backup tooling is installed
+2. *Backup schedule* -- daily 2:00 AM backups of `vm-production` and `vm-staging` namespaces with CSI snapshots
+3. *DataProtectionApplication* -- configures Velero with the kubevirt plugin for VM-aware backups
+
+If any of these components are deleted or modified, ACM automatically recreates them.
+
+=== Show
+
+* Apply the backup enforcement policy:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-backup-enforcement-policy.yaml
+----
+
+* In the ACM console, navigate to *Governance* → *Policies* and locate `vm-backup-enforcement`
+
+* Click the policy name to view compliance status per cluster
+
+* On a managed cluster, verify the backup schedule exists:
++
+[source,role="execute"]
+----
+oc get schedule -n openshift-adp
+----
+
+* *Simulate drift* -- delete the backup schedule and watch ACM remediate:
++
+[source,role="execute"]
+----
+oc delete schedule vm-critical-backup -n openshift-adp
+----
+
+* Wait 30-60 seconds, then verify the schedule was automatically recreated:
++
+[source,role="execute"]
+----
+oc get schedule -n openshift-adp
+----
+
+[NOTE]
+====
+This self-healing behavior is the core value proposition: infrastructure drift is corrected automatically, eliminating the risk of missed backups due to human error or malicious deletion.
+====
+
+== Key Takeaways
+
+* ACM `ConfigurationPolicy` treats VM governance as declarative code
+* Policies target only relevant clusters via `Placement` with label selectors
+* Right-sizing metrics enable data-driven capacity planning without traditional hypervisor tools
+* Backup enforcement guarantees business continuity with automated drift remediation
+* All policies map to recognized compliance frameworks (NIST SP 800-53)

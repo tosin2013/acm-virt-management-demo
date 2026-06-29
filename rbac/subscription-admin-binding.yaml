@@ -1,0 +1,17 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gitops-subscription-admin
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops
+  - kind: User
+    name: demo-deployer
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: open-cluster-management:subscription-admin
+  apiGroup: rbac.authorization.k8s.io

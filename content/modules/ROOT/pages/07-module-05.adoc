@@ -1,0 +1,159 @@
+= Module 5: Fine-Grained ACM Permissions
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+== Part 1 -- Beyond All-or-Nothing RBAC
+
+=== Know
+
+_Historically, managing a multicluster fleet with RHACM required broad administrative roles that exposed the entire infrastructure to potential mismanagement. The ClusterPermission API changes this fundamentally by enabling surgical, namespace-scoped permission distribution to managed clusters._
+
+**Business Challenge:**
+A VM operations team needs to start, stop, restart, and console into VMs on managed clusters. Today, this requires either:
+
+* *cluster-admin on each managed cluster* -- too broad, exposes the entire cluster
+* *Manual Role/RoleBinding creation on each cluster* -- does not scale, drifts over time
+
+Neither option is acceptable for organizations with dozens of clusters and hundreds of VMs.
+
+**Technical Solution:**
+The `ClusterPermission` API (`clusterpermissions.rbac.open-cluster-management.io`) allows the Hub to:
+
+1. Define a custom role with exact kubevirt.io permissions
+2. Automatically distribute Role and RoleBinding resources to specific namespaces on managed clusters
+3. Maintain the lifecycle of distributed RBAC via ManifestWork synchronization
+4. Validate that referenced roles exist before deployment
+
+**Business Value:**
+
+* *Surgical precision* -- grant exactly `kubevirt.io:edit` on namespace `vm-production`, nothing else
+* *Lifecycle management* -- permissions are continuously synchronized, not "set and forget"
+* *Validation* -- the `validate: true` spec prevents broken authorization chains
+* *Centralized audit* -- all permission grants are visible on the Hub
+
+=== Show
+
+* Review the ClusterPermission manifest before applying:
++
+[source,role="execute"]
+----
+cat rbac/cluster-permission-vm-edit.yaml
+----
+
+* Note the key elements:
+** `clusterRole.rules` defines exactly which kubevirt.io operations are permitted
+** `roleBindings` targets specific namespaces (`vm-production`, `vm-staging`)
+** `validate: true` ensures the role exists before binding
+** The subject is a Group (`vm-operators`) -- not individual users
+
+== Part 2 -- Applying ClusterPermission
+
+=== Know
+
+_ClusterPermission resources are namespaced on the Hub -- the namespace name matches the managed cluster name. This is how ACM knows which managed cluster to target._
+
+When the ClusterPermission is created, the ACM ClusterPermission controller:
+
+1. Validates the requested roles exist on the target cluster
+2. Generates the Role and RoleBinding manifests
+3. Creates a ManifestWork resource to deploy them
+4. Continuously monitors for drift and re-applies if needed
+
+=== Show
+
+* Apply the ClusterPermission to target `managed-cluster-01`:
++
+[source,role="execute"]
+----
+oc apply -f rbac/cluster-permission-vm-edit.yaml
+----
+
+* Verify the ClusterPermission was created:
++
+[source,role="execute"]
+----
+oc get clusterpermissions -n managed-cluster-01
+----
+
+* Check the ManifestWork was created to distribute the RBAC:
++
+[source,role="execute"]
+----
+oc get manifestwork -n managed-cluster-01 -l rbac.open-cluster-management.io/cluster-permission=vm-editor-permission
+----
+
+* On the managed cluster, verify the Role and RoleBinding were created in the target namespace:
++
+[source,role="execute"]
+----
+oc get roles,rolebindings -n vm-production -l app.kubernetes.io/managed-by=cluster-permission
+----
+
+== Part 3 -- Demonstrating Scoped VM Access
+
+=== Know
+
+_The proof is in the access. A user in the `vm-operators` group can now manage VMs in the allowed namespaces -- and is denied access to everything else._
+
+This is the exact capability enterprises need: their VM operations team can start, stop, restart, and console into VMs without seeing the underlying node configuration, network topology, or storage infrastructure.
+
+=== Show
+
+* As a vm-operators group member, demonstrate permitted actions:
++
+[source,role="execute"]
+----
+oc auth can-i get virtualmachines.kubevirt.io -n vm-production --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `yes`
+
++
+[source,role="execute"]
+----
+oc auth can-i update virtualmachines/start.subresources.kubevirt.io -n vm-production --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `yes`
+
+* Now demonstrate denied actions -- the same user cannot access cluster-level resources:
++
+[source,role="execute"]
+----
+oc auth can-i get nodes --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `no`
+
++
+[source,role="execute"]
+----
+oc auth can-i get secrets -n openshift-config --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `no`
+
+* Show that the user has no access outside the permitted namespaces:
++
+[source,role="execute"]
+----
+oc auth can-i get virtualmachines.kubevirt.io -n kube-system --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `no`
+
+[NOTE]
+====
+**Point out to the customer:** "This operator can start, stop, restart, and console into any VM in `vm-production` and `vm-staging`. They cannot see a single node, secret, or resource outside those namespaces. And this permission is centrally managed from the Hub -- if you revoke it here, it disappears from all managed clusters within seconds."
+====
+
+== Key Takeaways
+
+* ClusterPermission API replaces manual Role/RoleBinding management at scale
+* Permissions are namespace-scoped and continuously synchronized via ManifestWork
+* The `validate` spec prevents broken authorization chains
+* VM operators get exactly the access they need -- kubevirt.io operations in specific namespaces
+* Revoking access on the Hub propagates to all managed clusters automatically

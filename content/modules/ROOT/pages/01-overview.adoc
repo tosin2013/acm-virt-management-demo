@@ -1,0 +1,78 @@
+= ACM Virtual Machine Management Demo Overview
+:toc:
+:toc-placement: preamble
+:icons: font
+
+Red Hat Advanced Cluster Management for Kubernetes (RHACM) provides unified multicluster governance for both traditional virtual machines and cloud-native containers -- managed from a single control plane.
+
+== Background
+
+Enterprise IT teams face a critical inflection point: migrating away from legacy hypervisor monopolies while maintaining operational rigor for workloads that cannot yet be containerized.
+
+Organizations need a governance framework that:
+
+* Enforces security and compliance policies across hundreds of clusters
+* Provides fleet-wide observability for both VMs and containers
+* Enables deployment workflows without granting dangerous cluster-admin privileges
+* Prevents accidental or malicious destruction of managed clusters
+
+This demo proves that RHACM with OpenShift Virtualization delivers all of these capabilities in a single, unified platform.
+
+== Problem
+
+A large enterprise runs 200+ VMs across 15 OpenShift clusters in three regions.
+Their current challenges:
+
+* *No centralized VM governance* -- each cluster team manages VM policies independently, leading to configuration drift and compliance gaps
+* *Fragmented observability* -- operators must log into each cluster individually to check VM health, consuming hours per incident
+* *Overprivileged access* -- developers have cluster-admin on all clusters because "that is how it has always been done"
+* *Destruction risk* -- a single `oc delete managedcluster` command could take down production workloads across an entire region
+* *Manual deployment* -- VM provisioning requires direct CLI access and tribal knowledge
+
+== Solution
+
+This demo walks through six capabilities that solve each of these problems:
+
+[cols="1,2", options="header"]
+|===
+| Module | Problem Solved
+
+| VM Policies and Governance
+| Eliminates configuration drift through declarative, self-healing policies
+
+| Fleet Observability
+| Provides a single Grafana dashboard for VM metrics across all clusters
+
+| Application Topology Views
+| Visual dependency graph with remote log access -- no per-cluster login needed
+
+| Deploy Without Cluster-Admin
+| GitOps workflows with `subscription-admin` -- deploy everywhere, admin nowhere
+
+| Fine-Grained ACM Permissions
+| Scoped VM start/stop/restart access via ClusterPermission API
+
+| Eradicate Cluster Destruction
+| Custom RBAC that cryptographically prevents cluster deletion
+|===
+
+== Benefits
+
+* *Unified governance*: one policy engine for VMs and containers across all clusters
+* *Operational efficiency*: fleet-wide observability eliminates per-cluster context switching
+* *Zero-trust deployment*: Git is the single source of truth, not human CLI access
+* *Risk elimination*: cluster destruction is architecturally impossible, not just "discouraged"
+
+== Common Customer Questions
+
+**"How does this work with our existing VMware VMs?"**
+→ OpenShift Virtualization runs KVM-based VMs natively on OpenShift. Migration Toolkit for Virtualization (MTV) provides automated migration from VMware. ACM governance applies identically to migrated VMs.
+
+**"What about compliance and auditing?"**
+→ Module 1 demonstrates policy enforcement mapped to NIST SP 800-53 controls. ACM provides continuous compliance reporting and automated remediation.
+
+**"Can we do this without disrupting existing teams?"**
+→ Module 4 demonstrates deployment without cluster-admin. Existing team workflows via Git are preserved -- RHACM adds governance on top, not a replacement workflow.
+
+**"What happens if someone tries to delete a cluster?"**
+→ Module 6 proves this is cryptographically denied by the Kubernetes API server. The operator sees a `Forbidden` error, and the cluster remains intact.

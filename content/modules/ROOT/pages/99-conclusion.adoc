@@ -1,0 +1,62 @@
+= Conclusion and Next Steps
+:source-highlighter: rouge
+:icons: font
+
+== What We Demonstrated
+
+This demo proved six capabilities that together deliver a unified, zero-trust governance framework for virtual machines managed by Red Hat Advanced Cluster Management:
+
+[cols="1,2", options="header"]
+|===
+| Capability | What the Customer Saw
+
+| *VM Policies and Governance*
+| Self-healing ConfigurationPolicies that enforce VM right-sizing metrics and backup schedules across the fleet -- with automatic drift remediation
+
+| *Fleet Observability*
+| A single Grafana dashboard providing fleet-wide, per-cluster, and per-VM metrics -- eliminating per-cluster login for diagnostics
+
+| *Application Topology Views*
+| Visual dependency graph spanning Hub and managed clusters, with remote log retrieval for VM workloads -- no kubeconfig required
+
+| *Deploy Without Cluster-Admin*
+| GitOps deployment via `subscription-admin` -- deploying VM governance across the fleet while being denied destructive actions
+
+| *Fine-Grained ACM Permissions*
+| ClusterPermission API distributing scoped `kubevirt.io` roles to specific namespaces on managed clusters -- centrally managed from the Hub
+
+| *Eradicate Cluster Destruction*
+| Custom ClusterRole with `delete` verb omitted for all cluster lifecycle APIs -- the Kubernetes API server cryptographically denies destruction attempts
+|===
+
+== Business Value Summary
+
+* *Unified governance*: one policy engine for VMs and containers across all clusters
+* *Operational efficiency*: fleet-wide observability eliminates hours of per-cluster context switching
+* *Zero-trust deployment*: Git is the single source of truth -- no human CLI access to production
+* *Compliance ready*: policies map to NIST SP 800-53, DISA STIG, HIPAA, and PCI-DSS controls
+* *Architectural safety*: cluster destruction is not discouraged -- it is architecturally impossible
+
+== Next Steps for the Customer
+
+1. **Proof of Concept** -- deploy this demo in the customer's environment with their actual managed clusters and VM workloads
+2. **Policy Customization** -- adapt the right-sizing thresholds and backup schedules to the customer's SLAs
+3. **RBAC Design Workshop** -- map the customer's team structure to ClusterPermission and non-destructive role configurations
+4. **Migration Planning** -- use Migration Toolkit for Virtualization (MTV) to migrate existing VMware VMs to OpenShift Virtualization under ACM governance
+5. **Production Rollout** -- progressive rollout starting with non-production clusters, expanding to production with validated policies
+
+== Additional Resources
+
+* https://access.redhat.com/documentation/en-us/red_hat_advanced_cluster_management_for_kubernetes/[RHACM Documentation]
+* https://docs.openshift.com/container-platform/latest/virt/about_virt/about-virt.html[OpenShift Virtualization Documentation]
+* https://open-cluster-management.io/[Open Cluster Management Project]
+* https://github.com/open-cluster-management-io/policy-collection[ACM Policy Collection]
+* https://github.com/open-cluster-management-io/cluster-permission[ClusterPermission Add-on]
+* https://github.com/stolostron/right-sizing[Right-Sizing Integration]
+* https://github.com/tosin2013/acm-virt-management-demo[This Demo Repository]
+
+== Feedback
+
+If you have questions or feedback about this demo, contact:
+
+* Tosin Akinosho (takinosh@redhat.com)

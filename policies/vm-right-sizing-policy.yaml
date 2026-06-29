@@ -1,0 +1,105 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: vm-right-sizing-metrics
+  namespace: open-cluster-management-policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: vm-right-sizing-prometheus-rules
+        spec:
+          remediationAction: enforce
+          severity: medium
+          namespaceSelector:
+            include:
+              - openshift-monitoring
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: monitoring.coreos.com/v1
+                kind: PrometheusRule
+                metadata:
+                  name: vm-right-sizing-rules
+                  namespace: openshift-monitoring
+                  labels:
+                    prometheus: k8s
+                    role: alert-rules
+                spec:
+                  groups:
+                    - name: kubevirt.rightsizing.rules
+                      interval: 60s
+                      rules:
+                        - record: kubevirt:vm_cpu_usage_ratio
+                          expr: |
+                            sum by (name, namespace, node) (
+                              rate(kubevirt_vmi_cpu_usage_seconds_total[5m])
+                            )
+                            /
+                            sum by (name, namespace, node) (
+                              kubevirt_vmi_resource_requests{resource="cpu"}
+                            )
+                        - record: kubevirt:vm_memory_usage_ratio
+                          expr: |
+                            sum by (name, namespace, node) (
+                              kubevirt_vmi_memory_working_set_bytes
+                            )
+                            /
+                            sum by (name, namespace, node) (
+                              kubevirt_vmi_resource_requests{resource="memory"}
+                            )
+                        - alert: VMOverProvisionedCPU
+                          expr: kubevirt:vm_cpu_usage_ratio < 0.1
+                          for: 24h
+                          labels:
+                            severity: info
+                          annotations:
+                            summary: "VM {{ $labels.name }} in {{ $labels.namespace }} is using less than 10% of requested CPU for 24h"
+                            description: "Consider reducing CPU requests to optimize resource allocation."
+                        - alert: VMUnderProvisionedMemory
+                          expr: kubevirt:vm_memory_usage_ratio > 0.9
+                          for: 1h
+                          labels:
+                            severity: warning
+                          annotations:
+                            summary: "VM {{ $labels.name }} in {{ $labels.namespace }} is using more than 90% of requested memory"
+                            description: "Consider increasing memory requests to prevent OOM conditions."
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: vm-metrics-allowlist
+        spec:
+          remediationAction: enforce
+          severity: low
+          namespaceSelector:
+            include:
+              - open-cluster-management-addon-observability
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: observability-metrics-custom-allowlist
+                  namespace: open-cluster-management-addon-observability
+                data:
+                  metrics_list.yaml: |
+                    names:
+                      - kubevirt_vmi_cpu_usage_seconds_total
+                      - kubevirt_vmi_memory_working_set_bytes
+                      - kubevirt_vmi_resource_requests
+                      - kubevirt_vmi_network_receive_bytes_total
+                      - kubevirt_vmi_network_transmit_bytes_total
+                      - kubevirt_vmi_storage_read_traffic_bytes_total
+                      - kubevirt_vmi_storage_write_traffic_bytes_total
+                      - kubevirt_vmi_phase_count
+                      - kubevirt_vm_running_status_last_transition_timestamp_seconds

@@ -1,0 +1,48 @@
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: virt-enabled-clusters
+  namespace: open-cluster-management-policies
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchExpressions:
+            - key: virtualization-enabled
+              operator: In
+              values:
+                - "true"
+            - key: vendor
+              operator: In
+              values:
+                - OpenShift
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: vm-right-sizing-placement
+  namespace: open-cluster-management-policies
+spec:
+  placementRef:
+    name: virt-enabled-clusters
+    apiGroup: cluster.open-cluster-management.io
+    kind: Placement
+  subjects:
+    - name: vm-right-sizing-metrics
+      apiGroup: policy.open-cluster-management.io
+      kind: Policy
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: vm-backup-placement
+  namespace: open-cluster-management-policies
+spec:
+  placementRef:
+    name: virt-enabled-clusters
+    apiGroup: cluster.open-cluster-management.io
+    kind: Placement
+  subjects:
+    - name: vm-backup-enforcement
+      apiGroup: policy.open-cluster-management.io
+      kind: Policy

@@ -1,0 +1,166 @@
+= Architecture and Demo Details
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 2
+
+toc::[]
+
+== Proposed Timing
+
+[cols="1,1,2", options="header"]
+|===
+| Module | Duration | Focus
+
+| Overview and Environment Walkthrough
+| 5 min
+| Verify clusters, ACM console navigation
+
+| Module 1: VM Policies and Governance
+| 10 min
+| Apply policies, verify compliance, trigger remediation
+
+| Module 2: Fleet Observability
+| 10 min
+| Grafana dashboards, fleet-wide and per-VM metrics
+
+| Module 3: Application Topology Views
+| 8 min
+| Deploy VM app via GitOps, inspect topology, remote logs
+
+| Module 4: Deploy Without Cluster-Admin
+| 8 min
+| Bind subscription-admin, deploy via Git Subscription
+
+| Module 5: Fine-Grained ACM Permissions
+| 8 min
+| Apply ClusterPermission, demonstrate scoped VM access
+
+| Module 6: Eradicate Cluster Destruction
+| 6 min
+| Apply non-destructive role, attempt and fail to delete cluster
+
+| *Total*
+| *~55 min*
+|
+|===
+
+== Products and Versions
+
+[cols="1,1", options="header"]
+|===
+| Product | Version
+
+| Red Hat OpenShift Container Platform
+| 4.16+
+
+| Red Hat Advanced Cluster Management
+| 2.12+
+
+| OpenShift Virtualization (CNV)
+| 4.16+
+
+| OpenShift Data Foundation (ODF)
+| 4.16+
+
+| OpenShift API for Data Protection (OADP)
+| 1.4+
+
+| OpenShift GitOps (ArgoCD)
+| 1.13+
+|===
+
+== Environment Credentials
+
+include::partial$credentials.adoc[]
+
+== Architecture
+
+The demo environment consists of one *Hub cluster* running RHACM and two or more *Managed clusters* running OpenShift Virtualization.
+
+----
+                    ┌─────────────────────────────────┐
+                    │        ACM Hub Cluster           │
+                    │   (.sandbox3008.opentlc.com)     │
+                    │                                  │
+                    │  ┌───────────┐ ┌──────────────┐  │
+                    │  │ Policy    │ │ Observability│  │
+                    │  │ Engine    │ │ (Grafana)    │  │
+                    │  └───────────┘ └──────────────┘  │
+                    │  ┌───────────┐ ┌──────────────┐  │
+                    │  │ GitOps    │ │ Cluster      │  │
+                    │  │ (ArgoCD)  │ │ Permission   │  │
+                    │  └───────────┘ └──────────────┘  │
+                    └──────────┬───────────┬───────────┘
+                               │           │
+                    ┌──────────▼──┐  ┌─────▼───────────┐
+                    │ Managed     │  │ Managed          │
+                    │ Cluster 01  │  │ Cluster 02       │
+                    │             │  │                  │
+                    │ ┌─────────┐ │  │ ┌─────────┐     │
+                    │ │ OCP Virt│ │  │ │ OCP Virt│     │
+                    │ │  (VMs)  │ │  │ │  (VMs)  │     │
+                    │ └─────────┘ │  │ └─────────┘     │
+                    └─────────────┘  └─────────────────┘
+----
+
+== Key API Groups
+
+[cols="1,2", options="header"]
+|===
+| API Group | Purpose in This Demo
+
+| `policy.open-cluster-management.io`
+| VM governance policies, placement bindings
+
+| `cluster.open-cluster-management.io`
+| Managed cluster lifecycle, cluster sets
+
+| `rbac.open-cluster-management.io`
+| ClusterPermission API for fine-grained access
+
+| `hive.openshift.io`
+| Cluster provisioning lifecycle (protected from deletion)
+
+| `kubevirt.io`
+| VirtualMachine and VirtualMachineInstance resources
+
+| `subresources.kubevirt.io`
+| VM start/stop/restart/pause/console operations
+
+| `monitoring.coreos.com`
+| PrometheusRule for VM right-sizing metrics
+|===
+
+== Troubleshooting
+
+[cols="1,2", options="header"]
+|===
+| Issue | Resolution
+
+| ACM console not loading
+| Verify the `multiclusterhub` pod is running: `oc get pods -n open-cluster-management`
+
+| Managed cluster shows "Unknown" status
+| Check the klusterlet agent: `oc get pods -n open-cluster-management-agent` on the managed cluster
+
+| Grafana dashboards empty
+| Verify observability is enabled: `oc get multiclusterobservability -o yaml`
+
+| Policies show "NonCompliant" unexpectedly
+| Check policy controller logs: `oc logs -n open-cluster-management deploy/governance-policy-propagator`
+
+| VM operations denied
+| Verify ClusterPermission was applied: `oc get clusterpermissions -n <managed-cluster-name>`
+|===
+
+== Follow-Up Resources
+
+* https://access.redhat.com/documentation/en-us/red_hat_advanced_cluster_management_for_kubernetes/[RHACM Documentation]
+* https://docs.openshift.com/container-platform/latest/virt/about_virt/about-virt.html[OpenShift Virtualization Documentation]
+* https://open-cluster-management.io/[Open Cluster Management upstream project]
+* https://github.com/open-cluster-management-io/policy-collection[ACM Policy Collection]
+* https://github.com/open-cluster-management-io/cluster-permission[ClusterPermission Add-on]
+
+== Authors
+
+* Tosin Akinosho (takinosh@redhat.com)

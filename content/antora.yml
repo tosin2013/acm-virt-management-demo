@@ -1,0 +1,15 @@
+name: acm-virt-management-demo
+title: "ACM Virtual Machine Management Demo"
+version: "1.0"
+start_page: ROOT:00-index.adoc
+nav:
+  - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    openshift_cluster_ingress_domain: "apps.cluster.sandbox3008.opentlc.com"
+    acm_hub_console: "https://console-openshift-console.apps.cluster.sandbox3008.opentlc.com"
+    grafana_url: "https://grafana-open-cluster-management-observability.apps.cluster.sandbox3008.opentlc.com"
+    acm_api: "https://api.cluster.sandbox3008.opentlc.com:6443"
+    guid: "sandbox3008"
+    user: "admin"
+    password: "PROVIDED_AT_RUNTIME"

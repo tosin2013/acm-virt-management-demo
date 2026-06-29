@@ -1,0 +1,72 @@
+apiVersion: rbac.open-cluster-management.io/v1alpha1
+kind: ClusterPermission
+metadata:
+  name: vm-editor-permission
+  namespace: managed-cluster-01
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+spec:
+  clusterRole:
+    rules:
+      - apiGroups:
+          - kubevirt.io
+        resources:
+          - virtualmachines
+          - virtualmachineinstances
+        verbs:
+          - get
+          - list
+          - watch
+          - update
+          - patch
+      - apiGroups:
+          - subresources.kubevirt.io
+        resources:
+          - virtualmachines/start
+          - virtualmachines/stop
+          - virtualmachines/restart
+          - virtualmachines/pause
+          - virtualmachines/unpause
+          - virtualmachineinstances/console
+          - virtualmachineinstances/vnc
+        verbs:
+          - get
+          - update
+      - apiGroups:
+          - cdi.kubevirt.io
+        resources:
+          - datavolumes
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+          - pods/log
+          - services
+          - events
+        verbs:
+          - get
+          - list
+          - watch
+  clusterRoleBinding:
+    subject:
+      kind: Group
+      name: vm-operators
+      apiGroup: rbac.authorization.k8s.io
+  roleBindings:
+    - namespace: vm-production
+      roleBinding:
+        subject:
+          kind: Group
+          name: vm-operators
+          apiGroup: rbac.authorization.k8s.io
+    - namespace: vm-staging
+      roleBinding:
+        subject:
+          kind: Group
+          name: vm-operators
+          apiGroup: rbac.authorization.k8s.io
+  validate: true

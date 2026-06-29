@@ -1,0 +1,140 @@
+= Module 2: Fleet Observability
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+== Part 1 -- Fleet-Wide VM Observability
+
+=== Know
+
+_In a traditional hypervisor environment, administrators use tools like vCenter to monitor VM health across clusters. In a multicluster OpenShift environment, RHACM Observability aggregates VM metrics from every managed cluster into a centralized Grafana instance on the Hub -- no per-cluster login required._
+
+**Business Challenge:**
+When an incident occurs across a fleet of 15 clusters running 200+ VMs, operators must log into each cluster individually to diagnose the problem. This context-switching wastes hours and delays incident resolution.
+
+**Technical Solution:**
+RHACM deploys the Cluster Monitoring Operator integration that:
+
+* Aggregates Prometheus metrics from all managed clusters to the Hub
+* Provides native OpenShift Virtualization Grafana dashboards
+* Uses the custom metrics allowlist (deployed by Module 1's policy) to forward kubevirt-specific metrics
+
+**Key Dashboards:**
+
+[cols="1,1,2", options="header"]
+|===
+| Dashboard | Granularity | Key Metrics
+
+| Cluster Overview
+| Fleet-wide
+| Total clusters running OCP Virt; VM counts by status (running, stopped, migrating, error); Operator health
+
+| Single Cluster View
+| Per-cluster
+| OCP Virt version; nodes hosting VMs; VM timeline by status and host node
+
+| Resource Utilization
+| Per-node / per-VM
+| CPU usage; memory consumption; network I/O; storage IOPS
+|===
+
+=== Show
+
+* Open Grafana at {grafana_url}
+
+* Navigate to *Dashboards* → *OpenShift Virtualization: Cluster Overview*
+
+* Observe the fleet-wide metrics:
+** Total number of clusters running OpenShift Virtualization
+** VM count broken down by status: running, stopped, error, migrating
+** Operator health alerts across the fleet
+
+[TIP]
+====
+Point out to the customer: "This single screen replaces logging into 15 clusters individually. Every VM across every cluster is visible here."
+====
+
+== Part 2 -- Single Cluster Deep Dive
+
+=== Know
+
+_The fleet overview answers "Is anything wrong?" -- the single cluster view answers "What exactly is wrong and where?"_
+
+When an operator spots an anomaly in the fleet overview, they click into a specific cluster to see:
+
+* Which physical nodes are hosting VMs
+* Performance timelines for each VM
+* Migration events and their triggers
+* Node-level resource saturation
+
+This drill-down capability eliminates the need for direct `oc` access to managed clusters for diagnostic purposes.
+
+=== Show
+
+* From the Cluster Overview dashboard, click on a managed cluster name to drill into the *Single Cluster View*
+
+* Observe per-node metrics:
+** Number of VMs per node
+** Node CPU and memory utilization
+** VM distribution across nodes
+
+* Select a specific VM to view its individual metrics:
+** CPU usage over time
+** Memory working set vs. requested
+** Network receive/transmit bytes
+** Storage read/write traffic
+
+* Alternatively, query VM metrics directly from the Hub:
++
+[source,role="execute"]
+----
+oc exec -n open-cluster-management-observability observatorium-thanos-query-0 -c thanos-query -- \
+  thanos query instant \
+  --http-address=http://localhost:9090 \
+  'kubevirt:vm_cpu_usage_ratio'
+----
+
+== Part 3 -- Identifying Right-Sizing Opportunities
+
+=== Know
+
+_The recording rules deployed by Module 1 calculate usage-to-request ratios for every VM. These ratios surface over-provisioned VMs (wasting resources) and under-provisioned VMs (risking OOM kills or CPU throttling)._
+
+The alerts configured in the right-sizing policy trigger when:
+
+* *VMOverProvisionedCPU* -- a VM uses less than 10% of its requested CPU for 24 hours
+* *VMUnderProvisionedMemory* -- a VM uses more than 90% of its requested memory for 1 hour
+
+These alerts appear in both the Grafana dashboards and the ACM Governance view.
+
+=== Show
+
+* In Grafana, navigate to the *Resource Utilization* dashboard
+
+* Filter by a managed cluster and look for VMs where:
+** CPU usage ratio is below 0.1 (over-provisioned)
+** Memory usage ratio is above 0.9 (under-provisioned)
+
+* Check for active right-sizing alerts in the ACM console:
+** Navigate to *Infrastructure* → *Clusters* → select a managed cluster → *Add-ons*
+** Or query the managed cluster directly:
++
+[source,role="execute"]
+----
+oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o jsonpath='{.spec.groups[0].rules[?(@.alert)].alert}'
+----
+
+[IMPORTANT]
+====
+**Key insight for the customer:** This is the Kubernetes-native equivalent of VMware DRS. Instead of a proprietary black-box algorithm, you get transparent Prometheus-based metrics that integrate with your existing monitoring stack and alerting workflows.
+====
+
+== Key Takeaways
+
+* RHACM Observability provides a single pane of glass for VM metrics across the entire fleet
+* Three dashboard levels (fleet → cluster → VM) enable rapid incident triage
+* Right-sizing metrics replace traditional hypervisor capacity planning tools
+* No per-cluster login or kubeconfig is required for observability
+* Custom metrics allowlists ensure VM-specific telemetry reaches the Hub

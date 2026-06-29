@@ -1,0 +1,127 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rhacm-nondestructive-operator
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+rules:
+  - apiGroups:
+      - cluster.open-cluster-management.io
+    resources:
+      - managedclusters
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - cluster.open-cluster-management.io
+    resources:
+      - managedclustersets
+      - managedclustersetbindings
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - hive.openshift.io
+    resources:
+      - clusterdeployments
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - hive.openshift.io
+    resources:
+      - clusterclaims
+      - clusterpools
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - internal.open-cluster-management.io
+    resources:
+      - managedclusterinfos
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - addon.open-cluster-management.io
+    resources:
+      - managedclusteraddons
+      - clustermanagementaddons
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - policy.open-cluster-management.io
+    resources:
+      - policies
+      - placementbindings
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - app.open-cluster-management.io
+    resources:
+      - subscriptions
+      - channels
+      - placementrules
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - apps.open-cluster-management.io
+    resources:
+      - applicationsets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - observability.open-cluster-management.io
+    resources:
+      - multiclusterobservabilities
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rhacm-nondestructive-operator-binding
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+subjects:
+  - kind: User
+    name: demo-operator
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: rhacm-nondestructive-operator
+  apiGroup: rbac.authorization.k8s.io
