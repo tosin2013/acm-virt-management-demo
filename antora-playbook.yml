@@ -1,0 +1,20 @@
+site:
+  title: "ACM Virtual Machine Management Demo"
+  start_page: acm-virt-management-demo::00-index.adoc
+  url: https://tosin2013.github.io/acm-virt-management-demo
+
+content:
+  sources:
+    - url: .
+      start_path: content
+      branches: HEAD
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+
+asciidoc:
+  sourcemap: true
+  attributes:
+    source-highlighter: highlight.js

@@ -1,5 +1,9 @@
 # ACM Virtual Machine Management Demo
 
+[![Build and Deploy](https://github.com/tosin2013/acm-virt-management-demo/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/tosin2013/acm-virt-management-demo/actions/workflows/deploy-pages.yml)
+
+**Live Site:** https://tosin2013.github.io/acm-virt-management-demo
+
 A Red Hat Showroom demo covering multicluster governance and virtualization lifecycle with Red Hat Advanced Cluster Management (RHACM) and OpenShift Virtualization.
 
 ## Demo Modules
