@@ -54,7 +54,7 @@ toc::[]
 | 4.16+
 
 | Red Hat Advanced Cluster Management
-| 2.12+
+| 2.16+
 
 | OpenShift Virtualization (CNV)
 | 4.16+

@@ -87,7 +87,7 @@ The hub cluster vars file (`acm-virt-hub.yaml`) provisions:
 
 | Component | Purpose |
 |-----------|---------|
-| RHACM 2.12 | Multicluster governance |
+| RHACM 2.16 | Multicluster governance (VM right-sizing GA, cross-cluster live migration GA) |
 | OpenShift Virtualization | KVM-based VM hosting |
 | OpenShift GitOps | ArgoCD for declarative deployment |
 | OADP 1.4 | Velero-based VM backup |
