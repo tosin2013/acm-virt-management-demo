@@ -5,6 +5,8 @@
 
 toc::[]
 
+NOTE: This module uses RHACM Observability (Grafana + Thanos backed by S3). The `ocp4_workload_rhacm_observability` role deploys this automatically during provisioning. For manual setup details, see xref:02-details.adoc#observability-setup[Observability Setup].
+
 == Part 1 -- Fleet-Wide VM Observability
 
 === Know

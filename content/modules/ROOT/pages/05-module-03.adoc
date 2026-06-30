@@ -30,7 +30,7 @@ RHACM's Application Topology view interprets ArgoCD `Application` and `Applicati
 
 === Show
 
-* Navigate to the ACM console at {acm_hub_console}
+* Navigate to the ACM console at {openshift_console_url}
 
 * Go to *Applications* in the left navigation
 

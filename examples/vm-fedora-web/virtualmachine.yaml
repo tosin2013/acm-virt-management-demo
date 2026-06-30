@@ -1,0 +1,66 @@
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: fedora-web
+  labels:
+    app: fedora-web
+    app.kubernetes.io/part-of: vm-fedora-web
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: fedora-web
+        app: fedora-web
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        devices:
+          disks:
+            - disk:
+                bus: virtio
+              name: rootdisk
+            - disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - masquerade: {}
+              name: default
+        resources:
+          requests:
+            memory: 2Gi
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - containerDisk:
+            image: quay.io/containerdisks/fedora:latest
+          name: rootdisk
+        - cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              packages:
+                - httpd
+              runcmd:
+                - systemctl enable --now httpd
+                - echo "Hello from $(hostname)" > /var/www/html/index.html
+          name: cloudinitdisk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fedora-web
+  labels:
+    app: fedora-web
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+  selector:
+    kubevirt.io/domain: fedora-web

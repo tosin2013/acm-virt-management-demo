@@ -64,7 +64,7 @@ When the ClusterPermission is created, the ACM ClusterPermission controller:
 
 === Show
 
-* Apply the ClusterPermission to target `managed-cluster-01`:
+* Apply the ClusterPermission to target `{student_cluster_name}`:
 +
 [source,role="execute"]
 ----
@@ -75,14 +75,14 @@ oc apply -f rbac/cluster-permission-vm-edit.yaml
 +
 [source,role="execute"]
 ----
-oc get clusterpermissions -n managed-cluster-01
+oc get clusterpermissions -n {student_cluster_name}
 ----
 
 * Check the ManifestWork was created to distribute the RBAC:
 +
 [source,role="execute"]
 ----
-oc get manifestwork -n managed-cluster-01 -l rbac.open-cluster-management.io/cluster-permission=vm-editor-permission
+oc get manifestwork -n {student_cluster_name} -l rbac.open-cluster-management.io/cluster-permission=vm-editor-permission
 ----
 
 * On the managed cluster, verify the Role and RoleBinding were created in the target namespace:

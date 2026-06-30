@@ -26,11 +26,11 @@ Override defaults with environment variables:
 AWS_REGION=us-west-2 NUM_STUDENTS=4 WORKER_TYPE=m5.metal ./agnosticd/check-quota.sh
 ```
 
-### Minimum Quotas (default: 2 clusters — 1 hub + 1 student)
+### Minimum Quotas (default: 2 clusters — 1 hub + 1 student, both m5.metal)
 
-| Resource | Hub (m5.metal) | Student (m5.2xlarge) | Total (2) | Default Quota | Action |
-|----------|----------------|----------------------|-----------|---------------|--------|
-| On-Demand vCPUs | 302 | 46 | 348 | 528 | OK (increase if adding students) |
+| Resource | Hub (m5.metal) | Student (m5.metal) | Total (2) | Default Quota | Action |
+|----------|----------------|---------------------|-----------|---------------|--------|
+| On-Demand vCPUs | 302 | 302 | 604 | 528 | Increase to 700+ |
 | Elastic IPs | 2 | 2 | 4 | 5 | OK (increase if adding students) |
 | VPCs | 1 | 1 | 2 | 5 | OK |
 | NAT Gateways | 1 | 1 | 2 | 5 | OK |
@@ -38,9 +38,9 @@ AWS_REGION=us-west-2 NUM_STUDENTS=4 WORKER_TYPE=m5.metal ./agnosticd/check-quota
 
 To request increases: [AWS Service Quotas Console](https://console.aws.amazon.com/servicequotas/)
 
-> **Tip:** The default (1 hub + 1 student) fits within standard AWS quotas.
-> For a hub-only demo use `NUM_STUDENTS=0 ./deploy.sh`. For multiple students,
-> check quotas first: `NUM_STUDENTS=3 ./agnosticd/check-quota.sh`.
+> **Important:** The default deployment (1 hub + 1 student) requires **604 vCPUs**,
+> which exceeds the default AWS quota of 528. Request a quota increase before deploying.
+> For a hub-only demo use `NUM_STUDENTS=0 ./deploy.sh`.
 
 ## Setup
 
@@ -160,6 +160,7 @@ tail -f ~/Development/agnosticd-v2-output/acmvirt-hub/acmvirt-hub.log
 | Component | Purpose |
 |-----------|---------|
 | RHACM 2.16 | Multicluster governance (VM right-sizing, cross-cluster live migration) |
+| RHACM Observability | Centralized Grafana + Thanos with auto-provisioned S3 bucket |
 | OpenShift Virtualization | KVM-based VM hosting |
 | OpenShift GitOps | ArgoCD for declarative deployment |
 | OADP | Velero-based VM backup |
@@ -172,18 +173,20 @@ Worker nodes use `m5.metal` instance type for bare-metal KVM support.
 
 | Component | Purpose |
 |-----------|---------|
+| OpenShift Virtualization | KVM-based VM hosting (same as hub) |
 | cert-manager | TLS certificate automation |
 | htpasswd auth | Student user accounts |
 | RHACM Import | Auto-registers spoke with hub RHACM |
 
-Worker nodes use `m5.2xlarge` (lighter than hub — no bare-metal needed).
+Worker nodes use `m5.metal` instance type for bare-metal KVM support (same as hub).
 
 ### Custom Roles
 
 | Role | Location | Purpose |
 |------|----------|---------|
 | `ocp4_workload_oadp` | `ansible/roles/ocp4_workload_oadp/` | Installs OADP operator with idempotency |
-| `ocp4_workload_rhacm_import` | `ansible/roles/ocp4_workload_rhacm_import/` | Imports spoke cluster into RHACM hub |
+| `ocp4_workload_rhacm_import` | `ansible/roles/ocp4_workload_rhacm_import/` | Imports spoke cluster into RHACM hub with configurable labels |
+| `ocp4_workload_rhacm_observability` | `ansible/roles/ocp4_workload_rhacm_observability/` | Deploys MCO with S3-backed Thanos and Grafana |
 | `install_operator` (modified) | `ansible/roles/install_operator/` | Added CSV pre-check for idempotent installs |
 
 ## Output Files
@@ -207,4 +210,5 @@ Student cluster data is available in the Antora lab content as attributes:
 | `{student_1_ssh_command}` | Full SSH command for student 1 |
 | `{hub_console_url}` | Hub cluster console URL |
 | `{hub_api_url}` | Hub cluster API URL |
+| `{grafana_url}` | RHACM Observability Grafana URL |
 | `{num_students}` | Total number of students deployed |

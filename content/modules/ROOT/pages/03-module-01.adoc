@@ -25,7 +25,14 @@ RHACM uses `ConfigurationPolicy` resources to wrap kubevirt.io objects in a decl
 
 === Show
 
-* Verify that the managed clusters are labeled for virtualization targeting:
+* First, label the student cluster for virtualization targeting:
++
+[source,role="execute"]
+----
+oc label managedcluster {student_cluster_name} virtualization-enabled=true --overwrite
+----
+
+* Verify that the managed clusters are labeled:
 +
 [source,role="execute"]
 ----
@@ -69,7 +76,7 @@ oc apply -f policies/vm-right-sizing-policy.yaml
 oc apply -f policies/placement-binding.yaml
 ----
 
-* Navigate to the ACM console at {acm_hub_console}
+* Navigate to the ACM console at {openshift_console_url}
 
 * Go to *Governance* → *Policies* and verify the `vm-right-sizing-metrics` policy shows *Compliant*
 

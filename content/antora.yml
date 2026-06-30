@@ -9,13 +9,27 @@ asciidoc:
     lab_name: "ACM Virtual Machine Management Demo"
     release-version: master
     page-pagination: true
-    openshift_cluster_ingress_domain: "apps.cluster.sandbox3008.opentlc.com"
-    acm_hub_console: "https://console-openshift-console.apps.cluster.sandbox3008.opentlc.com"
-    grafana_url: "https://grafana-open-cluster-management-observability.apps.cluster.sandbox3008.opentlc.com"
-    acm_api: "https://api.cluster.sandbox3008.opentlc.com:6443"
-    guid: "sandbox3008"
+    # Hub cluster attributes (overridden at runtime by Showroom user_data)
+    openshift_cluster_ingress_domain: "apps.hub.GUID.sandbox.opentlc.com"
+    openshift_console_url: "https://console-openshift-console.apps.hub.GUID.sandbox.opentlc.com"
+    openshift_api_url: "https://api.hub.GUID.sandbox.opentlc.com:6443"
+    guid: "GUID"
+    bastion_ssh_user_name: "student"
+    bastion_ssh_password: "PROVIDED_AT_RUNTIME"
     user: "admin"
     password: "PROVIDED_AT_RUNTIME"
+    # Student cluster attributes (injected by deploy.sh via Showroom)
+    student_1_console_url: "https://console-openshift-console.apps.student.GUID-s1.sandbox.opentlc.com"
+    student_1_api_url: "https://api.student.GUID-s1.sandbox.opentlc.com:6443"
+    student_1_bastion_hostname: "bastion.GUID-s1.sandbox.opentlc.com"
+    student_1_bastion_ssh_user: "student"
+    student_1_bastion_ssh_password: "PROVIDED_AT_RUNTIME"
+    student_1_ssh_command: "ssh student@bastion.GUID-s1.sandbox.opentlc.com"
+    num_students: "1"
+    # Managed cluster name as registered in RHACM
+    student_cluster_name: "student-1"
+    # RHACM Observability (injected by deploy.sh)
+    grafana_url: "https://grafana-open-cluster-management-observability.apps.hub.GUID.sandbox.opentlc.com"
     page-links:
     - url: https://github.com/tosin2013/acm-virt-management-demo
       text: GitHub Repository

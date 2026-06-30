@@ -59,48 +59,90 @@ toc::[]
 | OpenShift Virtualization (CNV)
 | 4.22+
 
-| OpenShift Data Foundation (ODF)
-| 4.22+
-
 | OpenShift API for Data Protection (OADP)
-| 1.4+
+| 1.6+
 
 | OpenShift GitOps (ArgoCD)
-| 1.15+
+| 1.21+
 |===
 
 == Environment Credentials
 
 include::partial$credentials.adoc[]
 
+== Connecting to Clusters
+
+The Showroom terminal is connected to the *Hub cluster bastion*. Commands you run there execute against the Hub cluster by default.
+
+=== Hub Cluster
+
+The Hub bastion is pre-configured with `oc` and a kubeconfig for the Hub cluster:
+
+[source,role="execute"]
+----
+oc whoami
+oc get managedclusters
+----
+
+=== Student Cluster (Managed Cluster)
+
+To run `oc` commands on the student cluster, SSH to the student bastion from the Hub terminal:
+
+[source,role="execute"]
+----
+{student_1_ssh_command}
+----
+
+Password: `{student_1_bastion_ssh_password}`
+
+Once connected, the student bastion has its own kubeconfig:
+
+[source,bash]
+----
+oc whoami
+oc get nodes
+----
+
+To return to the Hub terminal, type `exit`.
+
+[TIP]
+====
+Many demo steps (policies, topology, permissions) are run from the *Hub cluster* because RHACM manages everything centrally. You only need the student cluster bastion to verify that resources were distributed to the managed cluster.
+====
+
 == Architecture
 
-The demo environment consists of one *Hub cluster* running RHACM and two or more *Managed clusters* running OpenShift Virtualization.
+The demo environment consists of one *Hub cluster* running RHACM and one *Student cluster* (managed cluster) running OpenShift Virtualization. The Hub also self-registers as `local-cluster`.
 
 ----
-                    ┌─────────────────────────────────┐
-                    │        ACM Hub Cluster           │
-                    │   (.sandbox3008.opentlc.com)     │
-                    │                                  │
-                    │  ┌───────────┐ ┌──────────────┐  │
-                    │  │ Policy    │ │ Observability│  │
-                    │  │ Engine    │ │ (Grafana)    │  │
-                    │  └───────────┘ └──────────────┘  │
-                    │  ┌───────────┐ ┌──────────────┐  │
-                    │  │ GitOps    │ │ Cluster      │  │
-                    │  │ (ArgoCD)  │ │ Permission   │  │
-                    │  └───────────┘ └──────────────┘  │
-                    └──────────┬───────────┬───────────┘
-                               │           │
-                    ┌──────────▼──┐  ┌─────▼───────────┐
-                    │ Managed     │  │ Managed          │
-                    │ Cluster 01  │  │ Cluster 02       │
-                    │             │  │                  │
-                    │ ┌─────────┐ │  │ ┌─────────┐     │
-                    │ │ OCP Virt│ │  │ │ OCP Virt│     │
-                    │ │  (VMs)  │ │  │ │  (VMs)  │     │
-                    │ └─────────┘ │  │ └─────────┘     │
-                    └─────────────┘  └─────────────────┘
+              ┌──────────────────────────────────────┐
+              │     ACM Hub Cluster (acmvirt-hub)     │
+              │   hub.acmvirt-hub.sandbox3008...      │
+              │                                      │
+              │  ┌───────────┐  ┌──────────────────┐ │
+              │  │ RHACM     │  │ OCP Virt (CNV)   │ │
+              │  │ Policy    │  │ VMs on hub       │ │
+              │  │ Engine    │  │ (local-cluster)  │ │
+              │  └───────────┘  └──────────────────┘ │
+              │  ┌───────────┐  ┌──────────────────┐ │
+              │  │ GitOps    │  │ OADP             │ │
+              │  │ (ArgoCD)  │  │ (Velero backup)  │ │
+              │  └───────────┘  └──────────────────┘ │
+              │  ┌───────────────────────────────┐   │
+              │  │ Showroom (lab guide + terminal)│   │
+              │  └───────────────────────────────┘   │
+              └──────────────────┬───────────────────┘
+                                 │ RHACM manages
+                   ┌─────────────▼─────────────────┐
+                   │  Student Cluster (student-1)   │
+                   │  student.acmvirt-s1.sandbox... │
+                   │                                │
+                   │  ┌──────────────────────────┐  │
+                   │  │ OCP Virt (CNV)            │  │
+                   │  │ VM workloads deployed     │  │
+                   │  │ via policies & GitOps     │  │
+                   │  └──────────────────────────┘  │
+                   └────────────────────────────────┘
 ----
 
 == Key API Groups
@@ -130,6 +172,96 @@ The demo environment consists of one *Hub cluster* running RHACM and two or more
 | `monitoring.coreos.com`
 | PrometheusRule for VM right-sizing metrics
 |===
+
+[[observability-setup]]
+== Observability Setup (Module 2)
+
+Module 2 (Fleet Observability) requires RHACM Observability which deploys Grafana and Thanos for centralized metrics backed by S3 object storage.
+
+=== Automated Deployment
+
+The `ocp4_workload_rhacm_observability` role handles this end-to-end:
+
+* Creates an S3 bucket (`acm-obs-<GUID>`) for Thanos
+* Copies the cluster pull-secret to the observability namespace
+* Creates the `thanos-object-storage` secret with S3 credentials
+* Deploys the `MultiClusterObservability` CR
+* Waits for the Grafana route to become available
+* Reports the Grafana URL via `agnosticd_user_info`
+
+The role is idempotent — re-running `agd provision` skips the setup if MCO already exists.
+
+=== Manual Setup (if not using AgnosticD)
+
+If you are deploying manually without the AgnosticD role, follow these steps:
+
+. Create an S3 bucket for Thanos:
++
+[source,bash]
+----
+aws s3 mb s3://acm-observability-thanos --region us-east-2
+----
+
+. Create the observability namespace and object storage secret:
++
+[source,bash]
+----
+oc create namespace open-cluster-management-observability
+
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: thanos-object-storage
+  namespace: open-cluster-management-observability
+type: Opaque
+stringData:
+  thanos.yaml: |
+    type: s3
+    config:
+      bucket: acm-observability-thanos
+      endpoint: s3.us-east-2.amazonaws.com
+      insecure: false
+      access_key: <AWS_ACCESS_KEY>
+      secret_key: <AWS_SECRET_KEY>
+EOF
+----
+
+. Copy the cluster pull-secret:
++
+[source,bash]
+----
+DOCKER_CONFIG_JSON=`oc extract secret/pull-secret -n openshift-config --to=-`
+oc create secret generic multiclusterhub-operator-pull-secret \
+  -n open-cluster-management-observability \
+  --from-literal=.dockerconfigjson="$DOCKER_CONFIG_JSON" \
+  --type=kubernetes.io/dockerconfigjson
+----
+
+. Create the `MultiClusterObservability` CR:
++
+[source,bash]
+----
+cat <<EOF | oc apply -f -
+apiVersion: observability.open-cluster-management.io/v1beta2
+kind: MultiClusterObservability
+metadata:
+  name: observability
+spec:
+  observabilityAddonSpec: {}
+  storageConfig:
+    metricObjectStorage:
+      name: thanos-object-storage
+      key: thanos.yaml
+EOF
+----
+
+. Wait for the Grafana route:
++
+[source,bash]
+----
+oc get route grafana -n open-cluster-management-observability
+----
 
 == Troubleshooting
 
