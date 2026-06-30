@@ -92,7 +92,7 @@ oc get managedclusters
 
 To run `oc` commands on the student cluster, SSH to the student bastion from the Hub terminal:
 
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----

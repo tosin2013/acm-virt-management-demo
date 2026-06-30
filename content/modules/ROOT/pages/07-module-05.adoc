@@ -73,21 +73,21 @@ oc apply -f rbac/cluster-permission-vm-edit.yaml
 
 * Verify the ClusterPermission was created:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc get clusterpermissions -n {student_cluster_name}
 ----
 
 * Check the ManifestWork was created to distribute the RBAC:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc get manifestwork -n {student_cluster_name} -l rbac.open-cluster-management.io/cluster-permission=vm-editor-permission
 ----
 
 * SSH to the managed cluster bastion to verify the Role and RoleBinding were created:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----

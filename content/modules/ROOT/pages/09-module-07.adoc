@@ -105,7 +105,7 @@ image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing me
 
 * Act on the recommendation -- SSH to the managed cluster bastion and resize the VM to match actual usage:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----

@@ -27,7 +27,7 @@ RHACM uses `ConfigurationPolicy` resources to wrap kubevirt.io objects in a decl
 
 * First, label the student cluster for virtualization targeting:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc label managedcluster {student_cluster_name} virtualization-enabled=true --overwrite
 ----
@@ -56,7 +56,7 @@ EOF
 
 * Create the VM workload namespaces on the managed cluster (the policies in later parts target these namespaces):
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----
@@ -120,7 +120,7 @@ oc apply -f policies/placement-binding.yaml
 
 * SSH to the student cluster bastion to verify the resources on the managed cluster:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----
@@ -178,7 +178,7 @@ oc apply -f policies/vm-backup-enforcement-policy.yaml
 
 * SSH to the student cluster bastion to verify the resources on the managed cluster:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----
@@ -255,7 +255,7 @@ image::acm-governance-policies-compliant.png[ACM Governance showing Compliant po
 
 * SSH to the student cluster bastion to verify the resources on the managed cluster:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----
@@ -303,7 +303,7 @@ oc apply -f policies/vm-security-hardening-policy.yaml
 
 * SSH to the student cluster bastion to verify the hardened VM preference exists:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 {student_1_ssh_command}
 ----

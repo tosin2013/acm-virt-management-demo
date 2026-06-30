@@ -119,20 +119,21 @@ _This is the most impactful moment of the entire demo. The operator attempts to 
 
 * **CLI Test** -- Attempt to delete a managed cluster:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc delete managedcluster {student_cluster_name} --as=demo-operator --dry-run=server
 ----
 +
 Expected output:
 +
+[subs="attributes+"]
 ----
 Error from server (Forbidden): managedclusters.cluster.open-cluster-management.io "{student_cluster_name}" is forbidden: User "demo-operator" cannot delete resource "managedclusters" in API group "cluster.open-cluster-management.io" at the cluster scope
 ----
 
 * **Hive Test** -- Attempt to delete a ClusterDeployment (if the managed cluster was provisioned via Hive):
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc delete clusterdeployment {student_cluster_name} -n {student_cluster_name} --as=demo-operator --dry-run=server
 ----
@@ -164,7 +165,7 @@ Expected output: `Error from server (Forbidden)`
 oc get managedclusters --as=demo-operator
 ----
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
 oc label managedcluster {student_cluster_name} demo-verified=true --as=demo-operator --dry-run=server
 ----
