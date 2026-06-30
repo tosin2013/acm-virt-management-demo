@@ -160,7 +160,7 @@ https://httpd-server-httpd-server.{openshift_cluster_ingress_domain}
 +
 Log in with your OpenShift credentials when prompted by the OAuth login page.
 
-* Upload the Windows Server 2019 ISO using the drag-and-drop interface. Name the file `win2019.iso`.
+* Upload the Windows Server 2019 ISO using the drag-and-drop interface. Name the file `win2k19.iso`.
 
 [TIP]
 ====
@@ -182,7 +182,7 @@ metadata:
 spec:
   source:
     http:
-      url: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso"
+      url: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso"
   pvc:
     accessModes: [ReadWriteOnce]
     storageClassName: gp3-csi

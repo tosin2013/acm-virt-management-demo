@@ -9,7 +9,7 @@ spec:
     name: windows-2019-image-build
   params:
     - name: iso-url
-      value: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso"
+      value: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso"
     - name: disk-size
       value: "60Gi"
     - name: iso-size

@@ -93,9 +93,9 @@ Server 2019 VM disk images:
 
 **Workflow:**
 
-1. Upload the Windows ISO to the file server UI as `win2019.iso`
+1. Upload the Windows ISO to the file server UI as `win2k19.iso`
 2. The pipeline creates a CDI DataVolume that imports the ISO from
-   `http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso`
+   `http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso`
 3. A blank disk DataVolume is provisioned for installation
 4. A VM boots from the ISO with VirtIO drivers attached for installation
 

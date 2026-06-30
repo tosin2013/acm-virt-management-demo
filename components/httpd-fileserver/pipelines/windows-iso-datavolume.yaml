@@ -9,7 +9,7 @@ metadata:
 spec:
   source:
     http:
-      url: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso"
+      url: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso"
   pvc:
     accessModes:
       - ReadWriteOnce
