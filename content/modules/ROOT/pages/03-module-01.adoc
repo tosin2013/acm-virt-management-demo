@@ -39,7 +39,7 @@ oc get managedclusters -l virtualization-enabled=true
 +
 [source,role="execute"]
 ----
-oc create namespace vm-demo-app
+oc create namespace vm-demo-app --dry-run=client -o yaml | oc apply -f -
 ----
 
 * Configure the ACM-ArgoCD integration by creating a `ManagedClusterSetBinding`, `Placement`, and `GitOpsCluster` resource. This enables ArgoCD's `clusterDecisionResource` generator to discover managed clusters via ACM Placement:
@@ -127,7 +127,7 @@ EOF
 +
 [source,role="execute"]
 ----
-oc get applications -n openshift-gitops -l app.kubernetes.io/part-of=vm-fedora-web
+oc get applications.argoproj.io -n openshift-gitops
 ----
 
 == Part 2 -- Deploy a Windows Server 2019 VM
@@ -229,15 +229,17 @@ The DataVolume progresses through `ImportScheduled` → `ImportInProgress` → `
 +
 [source,role="execute"]
 ----
+curl -sL https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/autounattend.xml -o /tmp/autounattend.xml
 oc create configmap win2019-autounattend -n vm-demo-app \
-  --from-file=autounattend.xml=https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/autounattend.xml \
+  --from-file=autounattend.xml=/tmp/autounattend.xml \
   --dry-run=client -o yaml | oc apply -f -
 ----
 +
 [source,role="execute"]
 ----
+curl -sL https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/sysprep-unattend.xml -o /tmp/sysprep-unattend.xml
 oc create configmap win2019-sysprep -n vm-demo-app \
-  --from-file=sysprep-unattend.xml=https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/sysprep-unattend.xml \
+  --from-file=sysprep-unattend.xml=/tmp/sysprep-unattend.xml \
   --dry-run=client -o yaml | oc apply -f -
 ----
 +
@@ -268,7 +270,7 @@ metadata:
   labels:
     app: windows-install
 spec:
-  running: true
+  runStrategy: Always
   template:
     metadata:
       labels:
@@ -324,7 +326,7 @@ spec:
             claimName: win2019-iso
         - name: virtiocontainerdisk
           containerDisk:
-            image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:latest
+            image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:7e06e1f52a434d4602657c920144504fbaed955d0998535bdf345716355ce83a
         - name: sysprep
           sysprep:
             configMap:
@@ -348,8 +350,10 @@ The `sysprep` volume uses KubeVirt's built-in sysprep disk support. It mounts th
 +
 [source,role="execute"]
 ----
-oc wait --for=condition=AgentConnected vmi/win2019-install -n vm-demo-app --timeout=600s
+oc wait --for=condition=AgentConnected vmi/win2019-install -n vm-demo-app --timeout=1800s
 ----
++
+NOTE: A full automated Windows install from ISO takes 15-30 minutes. The command above waits up to 30 minutes for the QEMU Guest Agent to connect after Windows Setup completes and runs the FirstLogonCommands.
 
 ==== Generalize with Sysprep (Optional -- for golden-image cloning)
 
