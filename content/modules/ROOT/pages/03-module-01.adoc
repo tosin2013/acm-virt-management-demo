@@ -136,15 +136,17 @@ oc get applications -n openshift-gitops -l app.kubernetes.io/part-of=vm-fedora-w
 
 _Windows Server workloads represent a significant portion of enterprise VM estates. OpenShift Virtualization supports Windows VMs natively, and this part demonstrates the ISO-based installation workflow -- the same approach administrators use with traditional hypervisors, but integrated into the Kubernetes ecosystem._
 
-The workflow uses three components:
+The workflow uses four components:
 
 * *HTTP File Server* -- an in-cluster file server (deployed on the Hub) where you upload the Windows ISO via a web UI
 * *CDI DataVolumes* -- Kubernetes resources that import the ISO from the file server into a PVC for the VM to boot from
 * *VirtIO drivers* -- Red Hat provides a container disk with Windows VirtIO drivers, attached as a secondary CD-ROM during installation
+* *Autounattend / Sysprep* -- XML answer files that automate the Windows installation and generalize the image for cloning
 
 **Business Value:**
 
-* *Familiar workflow* -- ISO-based installation mirrors traditional hypervisor processes
+* *Fully automated install* -- the `autounattend.xml` answer file eliminates all interactive prompts, installs VirtIO drivers, enables RDP, and installs the QEMU Guest Agent automatically
+* *Golden-image ready* -- a built-in sysprep step generalizes the finished VM so the disk can be cloned as a reusable template
 * *In-cluster hosting* -- ISOs are served from within the cluster, no external file shares needed
 * *Automated pipeline* -- Tekton pipelines can automate the entire image build process
 
@@ -223,7 +225,37 @@ oc get datavolume win2019-iso -n vm-demo-app -w
 +
 The DataVolume progresses through `ImportScheduled` → `ImportInProgress` → `Succeeded`. This may take several minutes depending on ISO size.
 
-* Create the Windows installation VM with VirtIO drivers attached:
+* Create ConfigMaps from the `autounattend.xml` and `sysprep-unattend.xml` answer files. These automate the entire Windows installation -- no manual prompts:
++
+[source,role="execute"]
+----
+oc create configmap win2019-autounattend -n vm-demo-app \
+  --from-file=autounattend.xml=https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/autounattend.xml \
+  --dry-run=client -o yaml | oc apply -f -
+----
++
+[source,role="execute"]
+----
+oc create configmap win2019-sysprep -n vm-demo-app \
+  --from-file=sysprep-unattend.xml=https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/sysprep-unattend.xml \
+  --dry-run=client -o yaml | oc apply -f -
+----
++
+[TIP]
+====
+Alternatively, clone the repo and create from local files:
+
+[source,bash]
+----
+git clone https://github.com/tosin2013/acm-virt-management-demo.git
+oc create configmap win2019-autounattend -n vm-demo-app \
+  --from-file=autounattend.xml=acm-virt-management-demo/examples/vm-win2019/autounattend.xml
+oc create configmap win2019-sysprep -n vm-demo-app \
+  --from-file=sysprep-unattend.xml=acm-virt-management-demo/examples/vm-win2019/sysprep-unattend.xml
+----
+====
+
+* Create the Windows installation VM with VirtIO drivers and autounattend attached:
 +
 [source,role="execute"]
 ----
@@ -258,6 +290,9 @@ spec:
             - cdrom:
                 bus: sata
               name: virtiocontainerdisk
+            - disk:
+                bus: virtio
+              name: sysprep
           interfaces:
             - masquerade: {}
               name: default
@@ -290,19 +325,82 @@ spec:
         - name: virtiocontainerdisk
           containerDisk:
             image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:latest
+        - name: sysprep
+          sysprep:
+            configMap:
+              name: win2019-autounattend
 EOF
 ----
 
 [NOTE]
 ====
-The VirtIO drivers container disk is attached as a secondary CD-ROM. During Windows installation, use "Load driver" to install the VirtIO storage and network drivers from this disk so Windows can see the VirtIO disk and network interface.
+The `sysprep` volume uses KubeVirt's built-in sysprep disk support. It mounts the `autounattend.xml` ConfigMap as a virtual floppy drive (`A:\`), which Windows Setup reads automatically during installation. This eliminates all interactive prompts:
+
+* VirtIO storage and network drivers are loaded automatically
+* Windows Server 2019 Standard (Desktop Experience) is selected
+* Disk partitioning, hostname (`win2019-demo`), and timezone (UTC) are configured
+* Administrator password is set to `R3dH4tD3mo!`
+* RDP and WinRM are enabled
+* QEMU Guest Agent is installed at first login
 ====
+
+* After Windows finishes installing and auto-logs in as Administrator (fully automated), the VM is ready. Verify the QEMU Guest Agent is reporting:
++
+[source,role="execute"]
+----
+oc wait --for=condition=AgentConnected vmi/win2019-install -n vm-demo-app --timeout=600s
+----
+
+==== Generalize with Sysprep (Optional -- for golden-image cloning)
+
+If you want to turn this installed VM into a reusable golden image, run sysprep to strip machine-specific identity (SID, hostname). This step is *optional* for the demo but required in production image-building workflows.
+
+* Stop the VM and swap the autounattend ConfigMap for the sysprep answer file:
++
+[source,role="execute"]
+----
+virtctl stop win2019-install -n vm-demo-app
+----
++
+[source,role="execute"]
+----
+oc patch virtualmachine win2019-install -n vm-demo-app --type=json -p='[
+  {"op": "remove", "path": "/spec/template/spec/volumes/3"},
+  {"op": "remove", "path": "/spec/template/spec/domain/devices/disks/3"}
+]'
+----
++
+[source,role="execute"]
+----
+oc patch virtualmachine win2019-install -n vm-demo-app --type=json -p='[
+  {"op": "add", "path": "/spec/template/spec/domain/devices/disks/-",
+   "value": {"disk": {"bus": "virtio"}, "name": "sysprep"}},
+  {"op": "add", "path": "/spec/template/spec/volumes/-",
+   "value": {"name": "sysprep", "sysprep": {"configMap": {"name": "win2019-sysprep"}}}}
+]'
+----
+
+* Start the VM and open the console. Windows will boot to the desktop:
++
+[source,role="execute"]
+----
+virtctl start win2019-install -n vm-demo-app
+----
+
+* From the VM console (or via RDP), run sysprep:
++
+[source]
+----
+C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /unattend:A:\sysprep-unattend.xml
+----
++
+The VM will generalize itself and shut down. The resulting `win2019-disk` PVC is now a clean golden image that can be cloned for new VMs without SID conflicts.
 
 == Part 3 -- Verify VM Deployments
 
 === Know
 
-_With both Fedora and Windows VMs deployed, verify they are running correctly. The Fedora VM should be fully operational via GitOps, and the Windows VM should be booting from the installation ISO._
+_With both Fedora and Windows VMs deployed, verify they are running correctly. The Fedora VM should be fully operational via GitOps, and the Windows VM should have completed its automated installation._
 
 === Show
 
@@ -346,13 +444,23 @@ oc get virtualmachine win2019-install -n vm-demo-app
 oc get datavolume -n vm-demo-app
 ----
 
-* Access the Windows VM console through the OpenShift console to continue installation:
+* Access the Windows VM desktop through the OpenShift console:
 ** Navigate to {openshift_console_url}
 ** Go to *Virtualization* → *VirtualMachines* → select `win2019-install` → *Console*
+** You should see the Windows Server 2019 desktop (auto-logged in as Administrator)
+
+* Verify RDP is enabled and the QEMU Guest Agent is running (from the VM console):
++
+[source]
+----
+powershell -Command "Get-Service QEMU-GA | Select-Object Status"
+----
++
+Expected output: `Running`
 
 [TIP]
 ====
-For automated Windows image building, the repository includes Tekton pipeline manifests in `components/httpd-fileserver/pipelines/` that orchestrate the full ISO import, disk provisioning, and VM creation workflow.
+For automated Windows image building at scale, the repository includes Tekton pipeline manifests in `components/httpd-fileserver/pipelines/` that orchestrate the full ISO import, disk provisioning, and VM creation workflow.
 ====
 
 == Key Takeaways
@@ -360,6 +468,8 @@ For automated Windows image building, the repository includes Tekton pipeline ma
 * GitOps-driven VM deployment with ApplicationSets provides fleet-scale automation
 * The `clusterDecisionResource` generator dynamically targets clusters via ACM Placement
 * Windows VMs use the same ISO-based installation workflow as traditional hypervisors
+* `autounattend.xml` eliminates all interactive prompts -- VirtIO drivers, RDP, Guest Agent are configured automatically
+* Sysprep generalization produces reusable golden images without SID conflicts
 * CDI DataVolumes handle ISO import and disk provisioning declaratively
 * In-cluster file hosting eliminates the need for external NFS/SMB shares
 * Both Linux and Windows VMs are first-class citizens on OpenShift Virtualization
