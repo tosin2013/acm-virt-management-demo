@@ -26,11 +26,11 @@ Override defaults with environment variables:
 AWS_REGION=us-west-2 NUM_STUDENTS=4 WORKER_TYPE=m5.metal ./agnosticd/check-quota.sh
 ```
 
-### Minimum Quotas (default: 2 clusters — 1 hub + 1 student, both m5.metal)
+### Minimum Quotas (default: 1 hub with m5.metal + 1 SNO student on m5zn.metal)
 
-| Resource | Hub (m5.metal) | Student (m5.metal) | Total (2) | Default Quota | Action |
-|----------|----------------|---------------------|-----------|---------------|--------|
-| On-Demand vCPUs | 302 | 302 | 604 | 528 | Increase to 700+ |
+| Resource | Hub (m5.metal) | Student (SNO) | Total (2) | Default Quota | Action |
+|----------|----------------|---------------|-----------|---------------|--------|
+| On-Demand vCPUs | 302 | 50 | 352 | 528 | OK |
 | Elastic IPs | 2 | 2 | 4 | 5 | OK (increase if adding students) |
 | VPCs | 1 | 1 | 2 | 5 | OK |
 | NAT Gateways | 1 | 1 | 2 | 5 | OK |
@@ -38,9 +38,9 @@ AWS_REGION=us-west-2 NUM_STUDENTS=4 WORKER_TYPE=m5.metal ./agnosticd/check-quota
 
 To request increases: [AWS Service Quotas Console](https://console.aws.amazon.com/servicequotas/)
 
-> **Important:** The default deployment (1 hub + 1 student) requires **604 vCPUs**,
-> which exceeds the default AWS quota of 528. Request a quota increase before deploying.
-> For a hub-only demo use `NUM_STUDENTS=0 ./deploy.sh`.
+> **Note:** The default SNO deployment (1 hub + 1 student) requires only **352 vCPUs**,
+> which fits within the default AWS quota of 528. For multi-node students
+> (`STUDENT_TYPE=multinode`), 604+ vCPUs are needed — request a quota increase first.
 
 ## Setup
 
@@ -111,12 +111,53 @@ Environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NUM_STUDENTS` | `1` | Number of student clusters |
+| `STUDENT_TYPE` | `sno` | Student cluster topology: `sno` (single bare-metal node) or `multinode` (3 masters + 3 workers) |
 | `PARALLEL` | `false` | Parallel student provisioning |
 | `DEPLOY_HUB` | `true` | Deploy the RHACM hub cluster |
 | `DEPLOY_SHOWROOM` | `true` | Deploy Showroom after students (with their data) |
 | `HUB_GUID` | `acmvirt-hub` | GUID for the hub cluster |
 | `ACCOUNT` | `sandbox3008` | AgnosticD account name |
 | `SKIP_QUOTA_CHECK` | `false` | Bypass quota pre-flight |
+
+### Cost-Optimized: SNO Students (Default)
+
+By default, student clusters deploy as Single Node OpenShift (SNO) on `m5zn.metal`
+(48 vCPU, 192 GiB RAM, ~$3.96/hr). This is the cheapest AWS option that provides
+bare-metal KVM support for OpenShift Virtualization.
+
+```bash
+# Default — SNO students
+./deploy.sh
+
+# Explicit
+STUDENT_TYPE=sno ./deploy.sh
+```
+
+**Quota requirements (1 hub + 1 SNO student):**
+
+| Resource | Hub (m5.metal) | Student (SNO m5zn.metal) | Total | Default Quota |
+|----------|----------------|--------------------------|-------|---------------|
+| On-Demand vCPUs | 302 | 50 | 352 | 528 — OK |
+| Elastic IPs | 2 | 2 | 4 | 5 — OK |
+| VPCs | 1 | 1 | 2 | 5 — OK |
+
+**Tradeoffs vs. multi-node:**
+
+- No live migration (single node)
+- No HA — if the node dies, everything is down
+- Control plane and VMs share the same 48 vCPU / 192 GiB
+- Perfectly acceptable for demos and workshops
+
+### Full Multi-Node Students
+
+For production-like environments or when live migration testing is needed:
+
+```bash
+STUDENT_TYPE=multinode ./deploy.sh
+```
+
+This deploys students with 3x m5.metal workers (same as hub). Requires 604+ vCPUs
+of AWS quota — request an increase before deploying.
 
 ### Hub-only Deployment
 
@@ -169,7 +210,7 @@ tail -f ~/Development/agnosticd-v2-output/acmvirt-hub/acmvirt-hub.log
 
 Worker nodes use `m5.metal` instance type for bare-metal KVM support.
 
-### Student Clusters (`acm-virt-student.yaml`)
+### Student Clusters (`acm-virt-student-sno.yaml` / `acm-virt-student.yaml`)
 
 | Component | Purpose |
 |-----------|---------|
@@ -178,7 +219,10 @@ Worker nodes use `m5.metal` instance type for bare-metal KVM support.
 | htpasswd auth | Student user accounts |
 | RHACM Import | Auto-registers spoke with hub RHACM |
 
-Worker nodes use `m5.metal` instance type for bare-metal KVM support (same as hub).
+**SNO (default):** Single `m5zn.metal` node (48 vCPU, 192 GiB) — runs control plane
+and workloads on one bare-metal instance with KVM support.
+
+**Multi-node:** 3x `m5.metal` workers (same as hub) — full HA with live migration support.
 
 ### Custom Roles
 

@@ -20,31 +20,48 @@ REGION="${AWS_REGION:-us-east-2}"
 NUM_STUDENTS="${NUM_STUDENTS:-2}"
 TOTAL_CLUSTERS=$((1 + NUM_STUDENTS))
 WORKER_TYPE="${WORKER_TYPE:-m5.metal}"
+STUDENT_TYPE="${STUDENT_TYPE:-sno}"
 
 echo "================================================================"
 echo "  AWS Quota Pre-flight Check"
 echo "  Region:   $REGION"
 echo "  Clusters: $TOTAL_CLUSTERS (1 hub + $NUM_STUDENTS students)"
-echo "  Workers:  $WORKER_TYPE"
+echo "  Hub workers:     $WORKER_TYPE"
+echo "  Student type:    $STUDENT_TYPE"
 echo "================================================================"
 echo ""
 
-# vCPU calculation
+# vCPU calculation for hub
 if [[ "$WORKER_TYPE" == "m5.metal" ]]; then
-  VCPU_PER_WORKER=96
+  VCPU_PER_HUB_WORKER=96
 elif [[ "$WORKER_TYPE" == "m6i.2xlarge" ]]; then
-  VCPU_PER_WORKER=8
+  VCPU_PER_HUB_WORKER=8
 elif [[ "$WORKER_TYPE" == "m5.2xlarge" ]]; then
-  VCPU_PER_WORKER=8
+  VCPU_PER_HUB_WORKER=8
 else
-  VCPU_PER_WORKER=8
+  VCPU_PER_HUB_WORKER=8
 fi
 
-VCPU_CONTROL=12     # 3 x m6i.xlarge (4 vCPU each)
-VCPU_WORKERS=$((3 * VCPU_PER_WORKER))
-VCPU_BASTION=2      # t3.medium
-VCPU_PER_CLUSTER=$((VCPU_CONTROL + VCPU_WORKERS + VCPU_BASTION))
-VCPU_TOTAL=$((VCPU_PER_CLUSTER * TOTAL_CLUSTERS))
+VCPU_HUB_CONTROL=12     # 3 x m6i.xlarge (4 vCPU each)
+VCPU_HUB_WORKERS=$((3 * VCPU_PER_HUB_WORKER))
+VCPU_HUB_BASTION=2      # t3.medium
+VCPU_HUB=$((VCPU_HUB_CONTROL + VCPU_HUB_WORKERS + VCPU_HUB_BASTION))
+
+# vCPU calculation for student clusters
+if [[ "$STUDENT_TYPE" == "sno" ]]; then
+  # SNO: single bare-metal node (m5zn.metal = 48 vCPU) + bastion
+  VCPU_PER_STUDENT=50    # 48 (m5zn.metal) + 2 (bastion)
+  STUDENT_DESC="SNO m5zn.metal"
+else
+  # Multi-node: 3 masters + 3 metal workers + bastion
+  VCPU_STUDENT_CONTROL=12
+  VCPU_STUDENT_WORKERS=$((3 * VCPU_PER_HUB_WORKER))
+  VCPU_STUDENT_BASTION=2
+  VCPU_PER_STUDENT=$((VCPU_STUDENT_CONTROL + VCPU_STUDENT_WORKERS + VCPU_STUDENT_BASTION))
+  STUDENT_DESC="multi-node $WORKER_TYPE"
+fi
+
+VCPU_TOTAL=$((VCPU_HUB + (VCPU_PER_STUDENT * NUM_STUDENTS)))
 
 EIP_PER_CLUSTER=2
 EIP_TOTAL=$((EIP_PER_CLUSTER * TOTAL_CLUSTERS))
@@ -124,14 +141,13 @@ echo ""
 echo "================================================================"
 echo "  Resource Requirements Summary"
 echo "================================================================"
-echo "  Per cluster ($WORKER_TYPE workers):"
-echo "    vCPUs:          $VCPU_PER_CLUSTER ($VCPU_CONTROL control + $VCPU_WORKERS workers + $VCPU_BASTION bastion)"
-echo "    Elastic IPs:    $EIP_PER_CLUSTER"
-echo "    VPCs:           1"
-echo "    NAT Gateways:   1"
-echo "    NLBs:           2"
+echo "  Hub cluster ($WORKER_TYPE workers):"
+echo "    vCPUs:          $VCPU_HUB ($VCPU_HUB_CONTROL control + $VCPU_HUB_WORKERS workers + $VCPU_HUB_BASTION bastion)"
 echo ""
-echo "  Total for $TOTAL_CLUSTERS clusters:"
+echo "  Per student cluster ($STUDENT_DESC):"
+echo "    vCPUs:          $VCPU_PER_STUDENT"
+echo ""
+echo "  Total for 1 hub + $NUM_STUDENTS student(s):"
 echo "    vCPUs:          $VCPU_TOTAL"
 echo "    Elastic IPs:    $EIP_TOTAL"
 echo "    VPCs:           $VPC_TOTAL"
