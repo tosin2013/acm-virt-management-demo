@@ -1,109 +1,91 @@
-= Module 7: VM Right-Sizing Recommendations
+= Module 7: Fine-Grained ACM Permissions
 :source-highlighter: rouge
 :toc: macro
 :toclevels: 1
 
 toc::[]
 
-== Part 1 -- Why Right-Sizing Matters
+== Part 1 -- Beyond All-or-Nothing RBAC
 
 === Know
 
-_In VMware environments, DRS (Distributed Resource Scheduler) automatically balances VM resource allocation across a cluster. When migrating to OpenShift Virtualization, organizations lose this built-in intelligence -- until now. RHACM 2.16 delivers GA right-sizing as the Kubernetes-native equivalent, using transparent Prometheus-based metrics instead of a proprietary black-box algorithm._
+_Historically, managing a multicluster fleet with RHACM required broad administrative roles that exposed the entire infrastructure to potential mismanagement. The ClusterPermission API changes this fundamentally by enabling surgical, namespace-scoped permission distribution to managed clusters._
 
 **Business Challenge:**
-Organizations migrating from VMware consistently over-allocate VM resources "just in case." Without a data-driven feedback loop, teams request 4 GiB of memory for workloads that use 400 MiB, and 4 vCPUs for single-threaded services. This waste compounds across hundreds of VMs and dozens of clusters -- inflating infrastructure costs while starving other workloads of capacity.
+A VM operations team needs to start, stop, restart, and console into VMs on managed clusters. Today, this requires either:
+
+* *cluster-admin on each managed cluster* -- too broad, exposes the entire cluster
+* *Manual Role/RoleBinding creation on each cluster* -- does not scale, drifts over time
+
+Neither option is acceptable for organizations with dozens of clusters and hundreds of VMs.
 
 **Technical Solution:**
-RHACM 2.16 right-sizing provides three dashboard levels that progressively drill down into resource efficiency:
+The `ClusterPermission` API (`clusterpermissions.rbac.open-cluster-management.io`) allows the Hub to:
 
-[cols="1,1,2", options="header"]
-|===
-| Dashboard Level | Granularity | What It Shows
-
-| Fleet Overview
-| All clusters
-| Total overestimation and underestimation counts across the managed fleet
-
-| Namespace View
-| Per-namespace
-| Aggregated resource waste grouped by namespace with configurable time windows (15d / 30d)
-
-| Per-VM Detail
-| Individual VM
-| Time-series CPU and memory usage vs. requests, with overestimation and underestimation flags
-|===
-
-**Metrics Architecture:**
-The dashboards are powered by `acm_rs_vm:*` metric families -- Prometheus recording rules deployed to managed clusters via ACM Policies. These recording rules pre-compute usage-to-request ratios so the dashboards load instantly even at fleet scale.
+1. Define a custom role with exact kubevirt.io permissions
+2. Automatically distribute Role and RoleBinding resources to specific namespaces on managed clusters
+3. Maintain the lifecycle of distributed RBAC via ManifestWork synchronization
+4. Validate that referenced roles exist before deployment
 
 **Business Value:**
 
-* *Data-driven capacity planning* -- replace guesswork with actual usage data across the fleet
-* *Cost optimization* -- identify and reclaim over-allocated resources systematically
-* *Performance protection* -- flag under-provisioned VMs before users experience OOM kills or CPU throttling
-* *VMware DRS replacement* -- GA Kubernetes-native alternative using open Prometheus standards
-
-== Part 2 -- Deploy Right-Sizing Policies and Dashboards
+* *Surgical precision* -- grant exactly `kubevirt.io:edit` on namespace `vm-production`, nothing else
+* *Lifecycle management* -- permissions are continuously synchronized, not "set and forget"
+* *Validation* -- the `validate: true` spec prevents broken authorization chains
+* *Centralized audit* -- all permission grants are visible on the Hub
 
 === Show
 
-* Review the recording rule policy that deploys the `acm_rs_vm:*` Prometheus recording rules to managed clusters:
+* Review the ClusterPermission manifest before applying:
 +
 [source,role="execute"]
 ----
-cat right-sizing/rs-vm-rules-policy.yaml
+cat rbac/cluster-permission-vm-edit.yaml
 ----
 
-* Apply the right-sizing policies and PolicySet:
-+
-[source,role="execute"]
-----
-oc apply -f right-sizing/rs-vm-rules-policy.yaml
-oc apply -f right-sizing/rs-vm-allowlist-policy.yaml
-oc apply -f right-sizing/rs-vm-policyset.yaml
-----
+* Note the key elements:
+** `clusterRole.rules` defines exactly which kubevirt.io operations are permitted
+** `roleBindings` targets specific namespaces (`vm-production`, `vm-staging`)
+** `validate: true` ensures the role exists before binding
+** The subject is a Group (`vm-operators`) -- not individual users
 
-* Verify all right-sizing policies are Compliant:
-+
-[source,role="execute"]
-----
-oc get policy -n open-cluster-management-policies | grep rs-vm
-----
-+
-Both `rs-vm-recording-rules` and `rs-vm-metrics-allowlist` should show `Compliant` status within a few minutes.
+== Part 2 -- Applying ClusterPermission
 
-* Deploy the Grafana dashboards:
-+
-[source,role="execute"]
-----
-oc apply -f right-sizing/vm-right-sizing-dashboard-main.yaml
-oc apply -f right-sizing/vm-right-sizing-dashboard-overestimation.yaml
-oc apply -f right-sizing/vm-right-sizing-dashboard-underestimation.yaml
-----
+=== Know
 
-* Navigate to Grafana at {grafana_url} → search for *"ACM Right Sizing Openshift Virtualization Dashboard"*
+_ClusterPermission resources are namespaced on the Hub -- the namespace name matches the managed cluster name. This is how ACM knows which managed cluster to target._
 
-image::right-sizing-main-dashboard.png[ACM Right Sizing main dashboard showing VM fleet metrics]
+When the ClusterPermission is created, the ACM ClusterPermission controller:
 
-[TIP]
-====
-Point out to the customer: "This is the VMware DRS replacement -- but instead of a proprietary algorithm, you get transparent Prometheus metrics that integrate with your existing monitoring and alerting stack."
-====
-
-== Part 3 -- Identify and Act on a Right-Sizing Recommendation
+1. Validates the requested roles exist on the target cluster
+2. Generates the Role and RoleBinding manifests
+3. Creates a ManifestWork resource to deploy them
+4. Continuously monitors for drift and re-applies if needed
 
 === Show
 
-* In the right-sizing dashboard, filter by cluster and locate the *fedora-web* VM deployed in Module 3
+* Apply the ClusterPermission to target `{student_cluster_name}`:
++
+[source,role="execute"]
+----
+oc apply -f rbac/cluster-permission-vm-edit.yaml
+----
 
-* Observe the overestimation flag: the VM requests 2Gi memory but the httpd workload uses far less -- memory overestimation is flagged by the recording rules
+* Verify the ClusterPermission was created:
++
+[source,role="execute",subs="attributes+"]
+----
+oc get clusterpermissions -n {student_cluster_name}
+----
 
-* Click the VM name to drill into the detailed per-VM view showing time-series usage vs. requests
+* Check the ManifestWork was created to distribute the RBAC:
++
+[source,role="execute",subs="attributes+"]
+----
+oc get manifestwork -n {student_cluster_name} -l rbac.open-cluster-management.io/cluster-permission=vm-editor-permission
+----
 
-image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing memory overestimation for fedora-web]
-
-* Act on the recommendation -- SSH to the managed cluster bastion and resize the VM to match actual usage:
+* SSH to the managed cluster bastion to verify the Role and RoleBinding were created:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -112,21 +94,12 @@ image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing me
 +
 Password: `{student_1_bastion_ssh_password}`
 
-* Resize the VM memory to match actual usage:
+* Verify the distributed RBAC resources:
 +
 [source,role="execute"]
 ----
-oc patch virtualmachine fedora-web -n vm-demo-app --type=merge -p '{"spec":{"template":{"spec":{"domain":{"resources":{"requests":{"memory":"512Mi"}}}}}}}'
+oc get roles,rolebindings -n vm-production
 ----
-
-* Verify the VM restarts with the new memory size:
-+
-[source,role="execute"]
-----
-oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.spec.domain.resources.requests.memory}'
-----
-+
-Expected output: `512Mi`
 
 * Return to the Hub terminal:
 +
@@ -135,19 +108,68 @@ Expected output: `512Mi`
 exit
 ----
 
-* Wait for the right-sizing metrics to update. The recording rules run at 5-minute intervals, so allow a few minutes for the dashboards to reflect the change. Return to the right-sizing dashboard and observe the reduced overestimation.
+== Part 3 -- Demonstrating Scoped VM Access
 
-image::right-sizing-post-resize.png[Right-sizing dashboard showing reduced overestimation after resize]
+=== Know
 
-[IMPORTANT]
+_The proof is in the access. A user in the `vm-operators` group can now manage VMs in the allowed namespaces -- and is denied access to everything else._
+
+This is the exact capability enterprises need: their VM operations team can start, stop, restart, and console into VMs without seeing the underlying node configuration, network topology, or storage infrastructure.
+
+=== Show
+
+* As a vm-operators group member, demonstrate permitted actions:
++
+[source,role="execute"]
+----
+oc auth can-i get virtualmachines.kubevirt.io -n vm-production --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `yes`
+
++
+[source,role="execute"]
+----
+oc auth can-i update virtualmachines/start.subresources.kubevirt.io -n vm-production --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `yes`
+
+* Now demonstrate denied actions -- the same user cannot access cluster-level resources:
++
+[source,role="execute"]
+----
+oc auth can-i get nodes --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `no`
+
++
+[source,role="execute"]
+----
+oc auth can-i get secrets -n openshift-config --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `no`
+
+* Show that the user has no access outside the permitted namespaces:
++
+[source,role="execute"]
+----
+oc auth can-i get virtualmachines.kubevirt.io -n kube-system --as-group=vm-operators --as=vm-user
+----
++
+Expected output: `no`
+
+[NOTE]
 ====
-**Deliver this message to the customer:** "You just completed the full right-sizing loop: observe overestimation in the dashboard, resize the VM based on data, and verify the improvement -- all without leaving the RHACM ecosystem. This is the same workflow at scale across hundreds of VMs and dozens of clusters."
+**Point out to the customer:** "This operator can start, stop, restart, and console into any VM in `vm-production` and `vm-staging`. They cannot see a single node, secret, or resource outside those namespaces. And this permission is centrally managed from the Hub -- if you revoke it here, it disappears from all managed clusters within seconds."
 ====
 
 == Key Takeaways
 
-* RHACM 2.16 right-sizing is the GA Kubernetes-native replacement for VMware DRS
-* Three-level drill-down: fleet → namespace → per-VM with configurable aggregation windows (15d / 30d)
-* The complete right-sizing loop: observe overestimation → resize → verify improvement
-* All deployed via ACM Policies -- the same governance-as-code pattern from Module 1
-* Right-sizing integrates with the custom alerts from Module 2 for proactive notification
+* ClusterPermission API replaces manual Role/RoleBinding management at scale
+* Permissions are namespace-scoped and continuously synchronized via ManifestWork
+* The `validate` spec prevents broken authorization chains
+* VM operators get exactly the access they need -- kubevirt.io operations in specific namespaces
+* Revoking access on the Hub propagates to all managed clusters automatically

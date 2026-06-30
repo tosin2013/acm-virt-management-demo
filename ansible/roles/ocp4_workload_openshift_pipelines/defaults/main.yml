@@ -1,0 +1,5 @@
+---
+ocp4_workload_openshift_pipelines_channel: latest
+ocp4_workload_openshift_pipelines_automatic_install_plan_approval: true
+ocp4_workload_openshift_pipelines_starting_csv: ""
+ocp4_workload_openshift_pipelines_use_catalog_snapshot: false

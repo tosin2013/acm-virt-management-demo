@@ -1,45 +1,48 @@
-= Module 1: VM Policies and Governance
+= Module 1: Deploy VM Workloads
 :source-highlighter: rouge
 :toc: macro
 :toclevels: 1
 
 toc::[]
 
-== Part 1 -- Declarative VM Governance with ACM Policies
+== Part 1 -- Deploy a Fedora VM via GitOps
 
 === Know
 
-_Traditional VM management relies on manual runbooks and per-cluster configuration. A single missed patch or misconfigured backup schedule across 15 clusters can result in data loss or compliance violations. RHACM eliminates this risk by treating VM governance as code._
+_Before governing, monitoring, or securing virtual machines, you need to deploy them. This module gets VMs running on your managed clusters using two deployment methods: GitOps-driven Fedora VMs and ISO-based Windows Server installation._
 
-**Business Challenge:**
-Organizations running hundreds of VMs across multiple OpenShift clusters have no centralized way to enforce configuration standards. Each cluster team applies policies independently, leading to drift, inconsistent backup schedules, and blind spots in resource utilization.
-
-**Technical Solution:**
-RHACM uses `ConfigurationPolicy` resources to wrap kubevirt.io objects in a declarative governance layer. The policy engine continuously monitors managed clusters and automatically remediates drift -- if a required configuration is deleted or modified, ACM recreates it within seconds.
+The Fedora deployment uses an ArgoCD ApplicationSet with the `clusterDecisionResource` generator, which dynamically resolves which managed clusters to target based on RHACM Placement resources. Adding or removing clusters from the fleet automatically updates the application deployment -- no manual ArgoCD configuration required.
 
 **Business Value:**
 
-* *Automated compliance* -- policies map directly to NIST SP 800-53 controls (CM-2, CP-9)
-* *Self-healing infrastructure* -- drift is corrected without human intervention
-* *Targeted enforcement* -- policies apply only to clusters labeled `virtualization-enabled: true`
+* *Fleet-scale deployment* -- a single ApplicationSet deploys VMs to every matching cluster
+* *Dynamic targeting* -- cluster label changes automatically add or remove deployment targets
+* *GitOps audit trail* -- the VM definition lives in Git, every change is a commit
 
 === Show
 
-* First, label the student cluster for virtualization targeting:
+* First, label the student cluster so RHACM Placement resources can target it for virtualization workloads:
 +
 [source,role="execute",subs="attributes+"]
 ----
 oc label managedcluster {student_cluster_name} virtualization-enabled=true --overwrite
 ----
 
-* Verify that the managed clusters are labeled:
+* Verify the label was applied:
 +
 [source,role="execute"]
 ----
 oc get managedclusters -l virtualization-enabled=true
 ----
 
-* Create a ManagedClusterSetBinding so the Placement can select managed clusters:
+* Create a namespace for the VM workload on the Hub:
++
+[source,role="execute"]
+----
+oc create namespace vm-demo-app
+----
+
+* Configure the ACM-ArgoCD integration by creating a `ManagedClusterSetBinding`, `Placement`, and `GitOpsCluster` resource. This enables ArgoCD's `clusterDecisionResource` generator to discover managed clusters via ACM Placement:
 +
 [source,role="execute"]
 ----
@@ -48,212 +51,262 @@ apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
   name: global
-  namespace: open-cluster-management-policies
+  namespace: openshift-gitops
 spec:
   clusterSet: global
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: virt-enabled-clusters
+  namespace: openshift-gitops
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            virtualization-enabled: "true"
+---
+apiVersion: apps.open-cluster-management.io/v1beta1
+kind: GitOpsCluster
+metadata:
+  name: gitops-cluster
+  namespace: openshift-gitops
+spec:
+  argoServer:
+    cluster: local-cluster
+    argoNamespace: openshift-gitops
+  placementRef:
+    kind: Placement
+    apiGroup: cluster.open-cluster-management.io
+    name: virt-enabled-clusters
+    namespace: openshift-gitops
 EOF
 ----
 
-* Create the VM workload namespaces on the managed cluster (the policies in later parts target these namespaces):
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
-
+* Apply the ApplicationSet that deploys a Fedora VM to all virtualization-enabled clusters:
 +
 [source,role="execute"]
 ----
-oc create namespace vm-production --dry-run=client -o yaml | oc apply -f -
-oc create namespace vm-staging --dry-run=client -o yaml | oc apply -f -
+cat <<'EOF' | oc apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: vm-fedora-web
+  namespace: openshift-gitops
+spec:
+  generators:
+    - clusterDecisionResource:
+        configMapRef: acm-placement
+        labelSelector:
+          matchLabels:
+            cluster.open-cluster-management.io/placement: virt-enabled-clusters
+        requeueAfterSeconds: 180
+  template:
+    metadata:
+      name: 'vm-fedora-web-{{name}}'
+    spec:
+      project: default
+      source:
+        repoURL: 'https://github.com/tosin2013/acm-virt-management-demo.git'
+        targetRevision: main
+        path: examples/vm-fedora-web
+      destination:
+        server: '{{server}}'
+        namespace: vm-demo-app
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+EOF
 ----
 
-* Return to the Hub terminal:
+* Wait for ArgoCD to sync the application to the managed clusters:
 +
 [source,role="execute"]
 ----
-exit
+oc get applications -n openshift-gitops -l app.kubernetes.io/part-of=vm-fedora-web
 ----
 
-* Review the Placement resource that targets virtualization-enabled clusters:
-+
-[source,role="execute"]
-----
-oc get placement virt-enabled-clusters -n open-cluster-management-policies -o yaml
-----
-
-* Verify the PlacementDecision shows the expected clusters:
-+
-[source,role="execute"]
-----
-oc get placementdecision -n open-cluster-management-policies -l cluster.open-cluster-management.io/placement=virt-enabled-clusters -o yaml
-----
-
-== Part 2 -- VM Right-Sizing Metrics Policy
+== Part 2 -- Deploy a Windows Server 2019 VM
 
 === Know
 
-_Right-sizing VMs is one of the primary reasons organizations adopted traditional hypervisor tools like VMware DRS. RHACM brings this capability to Kubernetes-native VM management by deploying Prometheus recording rules that continuously track CPU and memory utilization ratios._
+_Windows Server workloads represent a significant portion of enterprise VM estates. OpenShift Virtualization supports Windows VMs natively, and this part demonstrates the ISO-based installation workflow -- the same approach administrators use with traditional hypervisors, but integrated into the Kubernetes ecosystem._
 
-The `vm-right-sizing-metrics` policy deploys two key components to every virtualization-enabled managed cluster:
+The workflow uses three components:
 
-* *PrometheusRule* with recording rules that calculate `kubevirt:vm_cpu_usage_ratio` and `kubevirt:vm_memory_usage_ratio`
-* *Custom metrics allowlist* that ensures VM metrics are forwarded to the ACM Hub observability stack
+* *HTTP File Server* -- an in-cluster file server (deployed on the Hub) where you upload the Windows ISO via a web UI
+* *CDI DataVolumes* -- Kubernetes resources that import the ISO from the file server into a PVC for the VM to boot from
+* *VirtIO drivers* -- Red Hat provides a container disk with Windows VirtIO drivers, attached as a secondary CD-ROM during installation
 
-These metrics power the fleet-wide Grafana dashboards demonstrated in Module 2.
+**Business Value:**
 
-=== Show
-
-* Apply the VM right-sizing policy:
-+
-[source,role="execute"]
-----
-oc apply -f policies/vm-right-sizing-policy.yaml
-oc apply -f policies/placement-binding.yaml
-----
-
-* Navigate to the ACM console at {openshift_console_url}
-
-* Go to *Governance* → *Policies* and verify the `vm-right-sizing-metrics` policy shows *Compliant*
-
-* SSH to the student cluster bastion to verify the resources on the managed cluster:
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
-
-* Verify the PrometheusRule was created:
-+
-[source,role="execute"]
-----
-oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o yaml
-----
-
-* Verify the recording rules are producing data:
-+
-[source,role="execute"]
-----
-oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
-  promtool query instant http://localhost:9090 'kubevirt:vm_cpu_usage_ratio'
-----
-
-* Return to the Hub terminal:
-+
-[source,role="execute"]
-----
-exit
-----
-
-== Part 3 -- VM Backup Enforcement Policy
-
-=== Know
-
-_Business continuity for VM workloads requires automated, verified backups. The `vm-backup-enforcement` policy ensures that every virtualization-enabled cluster has OADP (OpenShift API for Data Protection) installed and a daily backup schedule configured for critical VM namespaces._
-
-The policy enforces three layers of backup infrastructure:
-
-1. *OADP Operator subscription* -- ensures the backup tooling is installed
-2. *Backup schedule* -- daily 2:00 AM backups of `vm-production` and `vm-staging` namespaces with CSI snapshots
-3. *DataProtectionApplication* -- configures Velero with the kubevirt plugin for VM-aware backups
-
-If any of these components are deleted or modified, ACM automatically recreates them.
+* *Familiar workflow* -- ISO-based installation mirrors traditional hypervisor processes
+* *In-cluster hosting* -- ISOs are served from within the cluster, no external file shares needed
+* *Automated pipeline* -- Tekton pipelines can automate the entire image build process
 
 === Show
 
-* Apply the backup enforcement policy:
+* Open the HTTP File Server UI in your browser:
++
+----
+https://httpd-server-httpd-server.{openshift_cluster_ingress_domain}
+----
++
+Log in with your OpenShift credentials when prompted by the OAuth login page.
+
+* Upload the Windows Server 2019 ISO using the drag-and-drop interface. Name the file `win2019.iso`.
+
+[TIP]
+====
+The file server uses OpenShift OAuth for external access. Any user registered with the cluster's identity providers can log in. Internal cluster access (used by DataVolumes) does not require authentication.
+====
+
+* Create a DataVolume to import the Windows ISO from the file server into a PVC:
 +
 [source,role="execute"]
 ----
-oc apply -f policies/vm-backup-enforcement-policy.yaml
+cat <<'EOF' | oc apply -f -
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: win2019-iso
+  namespace: vm-demo-app
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    http:
+      url: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso"
+  pvc:
+    accessModes: [ReadWriteOnce]
+    storageClassName: gp3-csi
+    resources:
+      requests:
+        storage: 7Gi
+EOF
 ----
 
-* In the ACM console, navigate to *Governance* → *Policies* and locate `vm-backup-enforcement`
-
-* Click the policy name to view compliance status per cluster
-
-* SSH to the student cluster bastion to verify the resources on the managed cluster:
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
-
-* Verify the backup schedule exists:
-+
-[source,role="execute"]
-----
-oc get schedule -n openshift-adp
-----
-
-* *Simulate drift* -- delete the backup schedule and watch ACM remediate:
+* Create a blank disk DataVolume for the Windows installation target:
 +
 [source,role="execute"]
 ----
-oc delete schedule vm-critical-backup -n openshift-adp
+cat <<'EOF' | oc apply -f -
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: win2019-disk
+  namespace: vm-demo-app
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    blank: {}
+  pvc:
+    accessModes: [ReadWriteOnce]
+    storageClassName: gp3-csi
+    resources:
+      requests:
+        storage: 60Gi
+EOF
 ----
 
-* Wait 30-60 seconds, then verify the schedule was automatically recreated:
+* Wait for the ISO import to complete:
 +
 [source,role="execute"]
 ----
-oc get schedule -n openshift-adp
+oc get datavolume win2019-iso -n vm-demo-app -w
 ----
++
+The DataVolume progresses through `ImportScheduled` → `ImportInProgress` → `Succeeded`. This may take several minutes depending on ISO size.
 
-* Return to the Hub terminal:
+* Create the Windows installation VM with VirtIO drivers attached:
 +
 [source,role="execute"]
 ----
-exit
+cat <<'EOF' | oc apply -f -
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: win2019-install
+  namespace: vm-demo-app
+  labels:
+    app: windows-install
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: win2019-install
+    spec:
+      domain:
+        cpu:
+          cores: 4
+        devices:
+          disks:
+            - disk:
+                bus: virtio
+              name: installdisk
+              bootOrder: 2
+            - cdrom:
+                bus: sata
+              name: iso
+              bootOrder: 1
+            - cdrom:
+                bus: sata
+              name: virtiocontainerdisk
+          interfaces:
+            - masquerade: {}
+              name: default
+          inputs:
+            - type: tablet
+              bus: usb
+              name: tablet
+        resources:
+          requests:
+            memory: 8Gi
+        machine:
+          type: q35
+        features:
+          acpi: {}
+          hyperv:
+            relaxed: {}
+            vapic: {}
+            spinlocks:
+              spinlocks: 8191
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: installdisk
+          persistentVolumeClaim:
+            claimName: win2019-disk
+        - name: iso
+          persistentVolumeClaim:
+            claimName: win2019-iso
+        - name: virtiocontainerdisk
+          containerDisk:
+            image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:latest
+EOF
 ----
 
 [NOTE]
 ====
-This self-healing behavior is the core value proposition: infrastructure drift is corrected automatically, eliminating the risk of missed backups due to human error or malicious deletion.
+The VirtIO drivers container disk is attached as a secondary CD-ROM. During Windows installation, use "Load driver" to install the VirtIO storage and network drivers from this disk so Windows can see the VirtIO disk and network interface.
 ====
 
-== Part 4 -- VM Network Isolation and Resource Guardrails
+== Part 3 -- Verify VM Deployments
 
 === Know
 
-_In a shared cluster environment, unrestricted network access between VM namespaces creates lateral movement risk. A compromised VM in `vm-staging` could reach production services in `vm-production`. Similarly, a VM created with extreme resource requests (e.g., 64Gi memory on a 32Gi node) can starve other workloads._
-
-**Network Isolation Policy** (`vm-network-isolation`) enforces a default-deny NetworkPolicy in VM namespaces, allowing only:
-
-* Same-namespace pod-to-pod traffic
-* Monitoring scrape from `openshift-monitoring`
-* DNS resolution via `openshift-dns`
-* Outbound HTTP/HTTPS for package updates
-
-**Resource Guardrails Policy** (`vm-resource-guardrails`) enforces a LimitRange in VM namespaces that prevents extreme resource requests:
-
-* Min CPU: 500m, Max CPU: 8 cores
-* Min Memory: 512Mi, Max Memory: 16Gi
-* Default requests: 1 CPU, 1Gi memory
-
-Both policies map to NIST SP 800-53 controls: SC-7 (Boundary Protection) and CM-7 (Least Functionality).
+_With both Fedora and Windows VMs deployed, verify they are running correctly. The Fedora VM should be fully operational via GitOps, and the Windows VM should be booting from the installation ISO._
 
 === Show
 
-* Apply the network isolation and resource guardrails policies:
-+
-[source,role="execute"]
-----
-oc apply -f policies/vm-network-isolation-policy.yaml
-oc apply -f policies/vm-resource-guardrails-policy.yaml
-----
-
-* Verify the policies are Compliant in the ACM console under *Governance* -> *Policies*
-
-image::acm-governance-policies-compliant.png[ACM Governance showing Compliant policies]
-
-* SSH to the student cluster bastion to verify the resources on the managed cluster:
+* Check the Fedora VM status on the managed cluster:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -262,13 +315,21 @@ image::acm-governance-policies-compliant.png[ACM Governance showing Compliant po
 +
 Password: `{student_1_bastion_ssh_password}`
 
-* Verify the NetworkPolicy and LimitRange were created in the VM namespace:
 +
 [source,role="execute"]
 ----
-oc get networkpolicy -n vm-production
-oc get limitrange -n vm-production
+oc get virtualmachines -n vm-demo-app
+oc get virtualmachineinstances -n vm-demo-app
 ----
+
+* Verify the Fedora VM is running and accessible:
++
+[source,role="execute"]
+----
+oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.status.phase}'
+----
++
+Expected output: `Running`
 
 * Return to the Hub terminal:
 +
@@ -277,65 +338,28 @@ oc get limitrange -n vm-production
 exit
 ----
 
-== Part 5 -- VM Eviction Strategy and Security Hardening
-
-=== Know
-
-_Non-migratable VMs with a `LiveMigrate` eviction strategy can block OpenShift upgrades and node maintenance indefinitely. The `vm-eviction-strategy` policy ensures every VM in the fleet is configured for graceful live migration during maintenance windows._
-
-_Additionally, production server VMs rarely need serial console or graphics device access. Leaving these enabled expands the QEMU attack surface unnecessarily. The `vm-security-hardening` policy creates a `VirtualMachineClusterPreference` that disables these interfaces for server workloads._
-
-**Eviction Strategy Policy** -- uses `remediationAction: inform` to detect VMs that lack the `LiveMigrate` eviction strategy without forcefully restarting them. Maps to NIST CP-2 (Contingency Plan).
-
-**Security Hardening Policy** -- creates a `VirtualMachineClusterPreference` named `hardened-server-vm` that disables serial console and graphics device attachment. Maps to NIST SC-28 (Protection of Information at Rest) and CM-6 (Configuration Settings).
-
-=== Show
-
-* Apply the eviction strategy and security hardening policies:
+* Check the Windows VM status on the Hub (it runs locally since the DataVolumes were created on the Hub):
 +
 [source,role="execute"]
 ----
-oc apply -f policies/vm-eviction-strategy-policy.yaml
-oc apply -f policies/vm-security-hardening-policy.yaml
+oc get virtualmachine win2019-install -n vm-demo-app
+oc get datavolume -n vm-demo-app
 ----
 
-* Verify the policies in the ACM console under *Governance* -> *Policies*
+* Access the Windows VM console through the OpenShift console to continue installation:
+** Navigate to {openshift_console_url}
+** Go to *Virtualization* → *VirtualMachines* → select `win2019-install` → *Console*
 
-* SSH to the student cluster bastion to verify the hardened VM preference exists:
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
-
-* Verify the VirtualMachineClusterPreference was created:
-+
-[source,role="execute"]
-----
-oc get virtualmachineclusterpreferences hardened-server-vm -o yaml
-----
-
-* Return to the Hub terminal:
-+
-[source,role="execute"]
-----
-exit
-----
-
-[NOTE]
+[TIP]
 ====
-When creating new VMs, reference the hardened preference to automatically inherit the security settings: `spec.preference.name: hardened-server-vm`. This provides consistent security posture across the fleet without manual configuration per VM.
+For automated Windows image building, the repository includes Tekton pipeline manifests in `components/httpd-fileserver/pipelines/` that orchestrate the full ISO import, disk provisioning, and VM creation workflow.
 ====
 
 == Key Takeaways
 
-* ACM `ConfigurationPolicy` treats VM governance as declarative code
-* Policies target only relevant clusters via `Placement` with label selectors
-* Right-sizing metrics enable data-driven capacity planning without traditional hypervisor tools
-* Backup enforcement guarantees business continuity with automated drift remediation
-* Network isolation and resource guardrails prevent lateral movement and noisy-neighbor issues
-* Eviction strategy enforcement protects upgrade and maintenance operations
-* Security hardening reduces the QEMU attack surface for production VMs
-* All policies map to recognized compliance frameworks (NIST SP 800-53)
+* GitOps-driven VM deployment with ApplicationSets provides fleet-scale automation
+* The `clusterDecisionResource` generator dynamically targets clusters via ACM Placement
+* Windows VMs use the same ISO-based installation workflow as traditional hypervisors
+* CDI DataVolumes handle ISO import and disk provisioning declaratively
+* In-cluster file hosting eliminates the need for external NFS/SMB shares
+* Both Linux and Windows VMs are first-class citizens on OpenShift Virtualization

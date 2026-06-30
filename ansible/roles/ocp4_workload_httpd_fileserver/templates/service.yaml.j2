@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ ocp4_workload_httpd_fileserver_service_name }}
+  namespace: {{ ocp4_workload_httpd_fileserver_namespace }}
+  labels:
+    app: httpd-fileserver
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: httpd-fileserver-proxy-tls
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: proxy
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+  selector:
+    app: httpd-fileserver

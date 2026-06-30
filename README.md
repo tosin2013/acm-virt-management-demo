@@ -8,21 +8,24 @@ A Red Hat Showroom demo covering multicluster governance and virtualization life
 
 ## Demo Modules
 
-1. **VM Policies and Governance** -- Declarative VM governance via ACM ConfigurationPolicies
-2. **Fleet Observability** -- Centralized Grafana dashboards for VM metrics across clusters
-3. **Application Topology Views** -- Visual dependency graphs and remote log retrieval
-4. **Deploy Without Cluster-Admin** -- GitOps workflows using `subscription-admin`
-5. **Fine-Grained ACM Permissions** -- ClusterPermission API for scoped kubevirt.io roles
-6. **Eradicate Cluster Destruction** -- Custom RBAC preventing managed cluster deletion
-7. **VM Right-Sizing Recommendations** -- Official RHACM 2.16 right-sizing dashboards with observe-resize-verify workflow
+1. **Deploy VM Workloads** -- Fedora VMs via GitOps and Windows VMs via ISO-based installation
+2. **Application Topology Views** -- Visual dependency graphs and remote log retrieval
+3. **VM Policies and Governance** -- Declarative VM governance via ACM ConfigurationPolicies
+4. **Fleet Observability** -- Centralized Grafana dashboards for VM metrics across clusters
+5. **VM Right-Sizing Recommendations** -- RHACM 2.16 right-sizing dashboards with observe-resize-verify workflow
+6. **Deploy Without Cluster-Admin** -- GitOps workflows using `subscription-admin`
+7. **Fine-Grained ACM Permissions** -- ClusterPermission API for scoped kubevirt.io roles
+8. **Eradicate Cluster Destruction** -- Custom RBAC preventing managed cluster deletion
 
 ## Structure
 
 ```
-content/          Antora/AsciiDoc Showroom lab content
-policies/         ACM policy manifests (GitOps-ready)
-rbac/             RBAC manifests (ClusterRole, ClusterPermission)
-right-sizing/     ACM right-sizing policies and Grafana dashboard ConfigMaps
+content/                    Antora/AsciiDoc Showroom lab content
+policies/                   ACM policy manifests (GitOps-ready)
+rbac/                       RBAC manifests (ClusterRole, ClusterPermission)
+right-sizing/               ACM right-sizing policies and Grafana dashboard ConfigMaps
+components/httpd-fileserver/ In-cluster HTTP file server for ISO hosting (OAuth-secured UI)
+ansible/roles/              AgnosticD workload roles for automated deployment
 ```
 
 ## Local Preview

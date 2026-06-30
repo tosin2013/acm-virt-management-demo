@@ -27,7 +27,7 @@ The *Demo Details* section is your single reference for:
 * Architecture diagrams
 
 == Demo Modules
-This demo contains six modules, each covering a requirement from the ACM Deep-Dive Session.
+This demo contains eight modules, each covering a requirement from the ACM Deep-Dive Session.
 Every module uses the *Know* and *Show* structure:
 
 === Know

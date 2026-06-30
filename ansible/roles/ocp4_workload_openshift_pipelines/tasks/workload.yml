@@ -1,0 +1,35 @@
+---
+- name: Install OpenShift Pipelines operator
+  ansible.builtin.include_role:
+    name: install_operator
+  vars:
+    install_operator_action: install
+    install_operator_name: openshift-pipelines-operator-rh
+    install_operator_csv_nameprefix: openshift-pipelines-operator-rh
+    install_operator_namespace: openshift-operators
+    install_operator_manage_namespaces: []
+    install_operator_channel: "{{ ocp4_workload_openshift_pipelines_channel }}"
+    install_operator_catalog: redhat-operators
+    install_operator_automatic_install_plan_approval: >-
+      {{ ocp4_workload_openshift_pipelines_automatic_install_plan_approval | default(true) }}
+    install_operator_starting_csv: "{{ ocp4_workload_openshift_pipelines_starting_csv }}"
+    install_operator_catalogsource_setup: >-
+      {{ ocp4_workload_openshift_pipelines_use_catalog_snapshot | default(false) }}
+
+- name: Wait for TektonConfig to be ready
+  kubernetes.core.k8s_info:
+    api_version: operator.tekton.dev/v1alpha1
+    kind: TektonConfig
+    name: config
+  register: r_tekton_config
+  retries: 30
+  delay: 10
+  until:
+    - r_tekton_config.resources | length > 0
+    - r_tekton_config.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0
+
+- name: Save AgnosticD user data
+  agnosticd.core.agnosticd_user_info:
+    msg: "OpenShift Pipelines operator installed (channel: {{ ocp4_workload_openshift_pipelines_channel }})"
+    data:
+      openshift_pipelines_channel: "{{ ocp4_workload_openshift_pipelines_channel }}"

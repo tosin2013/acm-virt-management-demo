@@ -1,158 +1,223 @@
-= Module 4: Deploy Without Cluster-Admin
+= Module 4: Fleet Observability
 :source-highlighter: rouge
 :toc: macro
 :toclevels: 1
 
 toc::[]
 
-== Part 1 -- The Problem with Cluster-Admin
+NOTE: This module uses RHACM Observability (Grafana + Thanos backed by S3). The `ocp4_workload_rhacm_observability` role deploys this automatically during provisioning. For manual setup details, see xref:02-details.adoc#observability-setup[Observability Setup].
+
+== Part 1 -- Fleet-Wide VM Observability
 
 === Know
 
-_The traditional Kubernetes administrative model forces organizations into granting `cluster-admin` privileges to facilitate deployment and infrastructure scaling. This violates the principle of least privilege and introduces systemic risk -- a leaked credential or a rogue insider with cluster-admin can destroy the entire platform._
+_In a traditional hypervisor environment, administrators use tools like vCenter to monitor VM health across clusters. In a multicluster OpenShift environment, RHACM Observability aggregates VM metrics from every managed cluster into a centralized Grafana instance on the Hub -- no per-cluster login required._
 
 **Business Challenge:**
-Development teams need to deploy VM workloads across multiple clusters. The path of least resistance is granting `cluster-admin` to everyone who needs to deploy. This creates:
-
-* *Audit blind spots* -- cluster-admin actions are broadly scoped and difficult to attribute
-* *Blast radius* -- a compromised cluster-admin credential can delete namespaces, drain nodes, or destroy the entire cluster
-* *Compliance violations* -- regulatory frameworks (NIST, PCI-DSS, HIPAA) require least-privilege access models
+When an incident occurs across a fleet of 15 clusters running 200+ VMs, operators must log into each cluster individually to diagnose the problem. This context-switching wastes hours and delays incident resolution.
 
 **Technical Solution:**
-RHACM provides the `open-cluster-management:subscription-admin` ClusterRole that allows users to create Git Subscriptions deploying resources across multiple namespaces -- without granting `cluster-admin`.
+RHACM deploys the Cluster Monitoring Operator integration that:
 
-Combined with OpenShift GitOps (ArgoCD), the Git repository becomes the immutable single source of truth. Developers push to Git; ArgoCD syncs to clusters. No human ever runs `oc apply` directly against a production cluster.
+* Aggregates Prometheus metrics from all managed clusters to the Hub
+* Provides native OpenShift Virtualization Grafana dashboards
+* Uses the custom metrics allowlist (deployed by Module 3's policy) to forward kubevirt-specific metrics
+
+**Key Dashboards:**
+
+[cols="1,1,2", options="header"]
+|===
+| Dashboard | Granularity | Key Metrics
+
+| Cluster Overview
+| Fleet-wide
+| Total clusters running OCP Virt; VM counts by status (running, stopped, migrating, error); Operator health
+
+| Single Cluster View
+| Per-cluster
+| OCP Virt version; nodes hosting VMs; VM timeline by status and host node
+
+| Resource Utilization
+| Per-node / per-VM
+| CPU usage; memory consumption; network I/O; storage IOPS
+|===
 
 === Show
 
-* Review the current RBAC setup -- note that the demo-deployer user does NOT have cluster-admin:
-+
-[source,role="execute"]
-----
-oc auth can-i --list --as=demo-deployer | grep -E "cluster-admin|managedcluster"
-----
+* Open Grafana at {grafana_url}
 
-* Apply the subscription-admin binding from the rbac/ directory:
-+
-[source,role="execute"]
-----
-oc apply -f rbac/subscription-admin-binding.yaml
-----
+* Navigate to *Dashboards* → *OpenShift Virtualization: Cluster Overview*
 
-* Verify the binding was created:
-+
-[source,role="execute"]
-----
-oc get clusterrolebinding gitops-subscription-admin -o yaml
-----
+image::grafana-cluster-overview.png[Grafana Cluster Overview showing fleet-wide VM metrics]
 
-== Part 2 -- Deploying Via Git Subscription
+* Observe the fleet-wide metrics:
+** Total number of clusters running OpenShift Virtualization
+** VM count broken down by status: running, stopped, error, migrating
+** Operator health alerts across the fleet
+
+[TIP]
+====
+Point out to the customer: "This single screen replaces logging into 15 clusters individually. Every VM across every cluster is visible here."
+====
+
+== Part 2 -- Single Cluster Deep Dive
 
 === Know
 
-_With `subscription-admin` bound, a user can create RHACM Subscriptions that deploy resources from a Git repository to any namespace across the fleet. The subscription model provides:_
+_The fleet overview answers "Is anything wrong?" -- the single cluster view answers "What exactly is wrong and where?"_
 
-* *Declarative deployment* -- desired state is defined in Git, not in CLI commands
-* *Automatic sync* -- changes pushed to Git are automatically detected and applied
-* *Audit trail* -- every deployment change is a Git commit with author, timestamp, and diff
-* *Rollback capability* -- reverting a deployment is a Git revert
+When an operator spots an anomaly in the fleet overview, they click into a specific cluster to see:
 
-This model eliminates the need for developers to have direct CLI access to managed clusters entirely.
+* Which physical nodes are hosting VMs
+* Performance timelines for each VM
+* Migration events and their triggers
+* Node-level resource saturation
+
+This drill-down capability eliminates the need for direct `oc` access to managed clusters for diagnostic purposes.
 
 === Show
 
-* Create a Channel resource pointing to the Git repository:
+* From the Cluster Overview dashboard, click on a managed cluster name to drill into the *Single Cluster View*
+
+* Observe per-node metrics:
+** Number of VMs per node
+** Node CPU and memory utilization
+** VM distribution across nodes
+
+* Select a specific VM to view its individual metrics:
+** CPU usage over time
+** Memory working set vs. requested
+** Network receive/transmit bytes
+** Storage read/write traffic
+
+* Alternatively, query VM metrics directly from the Hub:
 +
 [source,role="execute"]
 ----
-cat <<EOF | oc apply -f -
-apiVersion: apps.open-cluster-management.io/v1
-kind: Channel
-metadata:
-  name: acm-virt-demo-channel
-  namespace: open-cluster-management-policies
-spec:
-  type: Git
-  pathname: https://github.com/tosin2013/acm-virt-management-demo.git
-EOF
+oc exec -n open-cluster-management-observability deploy/observability-thanos-query -c thanos-query -- \
+  curl -s 'http://localhost:9090/api/v1/query?query=kubevirt:vm_cpu_usage_ratio' | python3 -m json.tool
 ----
 
-* Create a Subscription that deploys VM workloads from the repository:
-+
-[source,role="execute"]
-----
-cat <<EOF | oc apply -f -
-apiVersion: apps.open-cluster-management.io/v1
-kind: Subscription
-metadata:
-  name: vm-workload-subscription
-  namespace: vm-demo-app
-  annotations:
-    apps.open-cluster-management.io/git-path: policies/
-    apps.open-cluster-management.io/git-branch: main
-spec:
-  channel: open-cluster-management-policies/acm-virt-demo-channel
-  placement:
-    placementRef:
-      name: virt-enabled-clusters
-      kind: Placement
-EOF
-----
-
-* Verify the subscription is propagating to managed clusters:
-+
-[source,role="execute"]
-----
-oc get subscription vm-workload-subscription -n vm-demo-app -o yaml | grep -A5 status
-----
-
-== Part 3 -- Proving Non-Admin Deployment Works
+== Part 3 -- Identifying Right-Sizing Opportunities
 
 === Know
 
-_The most compelling demonstration is showing that the deployment succeeded while the deploying user cannot perform destructive actions. This proves that productivity and security are not mutually exclusive._
+_The recording rules deployed by Module 3 calculate usage-to-request ratios for every VM. These ratios surface over-provisioned VMs (wasting resources) and under-provisioned VMs (risking OOM kills or CPU throttling)._
+
+The alerts configured in the right-sizing policy trigger when:
+
+* *VMOverProvisionedCPU* -- a VM uses less than 10% of its requested CPU for 24 hours
+* *VMUnderProvisionedMemory* -- a VM uses more than 90% of its requested memory for 1 hour
+
+These alerts appear in both the Grafana dashboards and the ACM Governance view.
 
 === Show
 
-* Verify the deployment was successful on the managed cluster -- the VM policies are applied:
+image::grafana-resource-utilization.png[Grafana Resource Utilization dashboard with per-VM metrics]
+
+* In Grafana, navigate to the *Resource Utilization* dashboard
+
+* Filter by a managed cluster and look for VMs where:
+** CPU usage ratio is below 0.1 (over-provisioned)
+** Memory usage ratio is above 0.9 (under-provisioned)
+
+* Check for active right-sizing alerts in the ACM console:
+** Navigate to *Infrastructure* → *Clusters* → select a managed cluster → *Add-ons*
+** Or query the managed cluster directly:
 +
 [source,role="execute"]
 ----
-oc get policies -n open-cluster-management-policies
+oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o jsonpath='{.spec.groups[0].rules[?(@.alert)].alert}'
 ----
-
-* Now prove that the same user cannot perform destructive cluster operations:
-+
-[source,role="execute"]
-----
-oc auth can-i delete managedclusters --as=demo-deployer
-----
-+
-Expected output: `no`
-
-* Verify the deployer cannot destroy managed clusters:
-+
-[source,role="execute"]
-----
-oc auth can-i delete managedclustersets --as=demo-deployer
-----
-+
-Expected output: `no`
-
-[NOTE]
-====
-The `subscription-admin` role grants namespace management permissions (needed for cross-namespace Git deployments), but does NOT grant cluster lifecycle destruction (`delete managedclusters`, `delete managedclustersets`). Module 6 demonstrates how to further restrict even these operational users from cluster destruction.
-====
 
 [IMPORTANT]
 ====
-**Key message for the customer:** "This user just deployed VM governance policies across your entire fleet via Git -- without cluster-admin. They can deploy workloads but cannot destroy managed clusters. Git is the single source of truth, not human CLI access."
+**Key insight for the customer:** This is the Kubernetes-native equivalent of VMware DRS. Instead of a proprietary black-box algorithm, you get transparent Prometheus-based metrics that integrate with your existing monitoring stack and alerting workflows.
+====
+
+== Part 4 -- Deploy Custom VM Alerts
+
+=== Know
+
+_Built-in dashboards show what is happening now. Custom alerts notify you before a problem becomes an incident. In this part, you deploy Thanos Ruler custom rules that fire alerts when VMs are consistently over-provisioned or under-provisioned -- the same metrics from Module 3, now with proactive notification._
+
+The `thanos-ruler-custom-rules` ConfigMap defines two alerts:
+
+* *VMOverProvisionedCPU* -- fires after 1 hour when a VM uses less than 10% of requested CPU (severity: info)
+* *VMUnderProvisionedMemory* -- fires after 30 minutes when a VM uses more than 90% of requested memory (severity: warning)
+
+=== Show
+
+* Review the custom alert rules:
++
+[source,role="execute"]
+----
+cat observability/vm-custom-alerts.yaml
+----
+
+* Apply the custom alert ConfigMap to the observability namespace:
++
+[source,role="execute"]
+----
+oc apply -f observability/vm-custom-alerts.yaml
+----
+
+* In Grafana, navigate to *Alerting* to verify the alert rules are loaded
+
+* Check for active alerts using the Thanos Query API:
++
+[source,role="execute"]
+----
+oc exec -n open-cluster-management-observability deploy/observability-thanos-query -c thanos-query -- \
+  curl -s 'http://localhost:9090/api/v1/query?query=ALERTS' | python3 -m json.tool
+----
+
+== Part 5 -- Deploy a Custom VM Fleet Dashboard
+
+=== Know
+
+_While the built-in dashboards provide general OpenShift Virtualization metrics, a custom dashboard tailored to your fleet's VM governance policies provides a single view that connects Module 3's policies to Module 4's observability. This is the "dashboards as code" approach -- the dashboard definition lives in Git alongside your policies._
+
+The `vm-grafana-dashboard` ConfigMap contains a custom Grafana dashboard with four panels:
+
+* *VM Count by Status* -- fleet-wide VM count (running, stopped, error)
+* *VM CPU Usage Ratio by Cluster* -- average CPU utilization ratio per cluster
+* *VM Memory Usage Ratio by Cluster* -- average memory utilization ratio per cluster
+* *Top 10 Over-Provisioned VMs* -- VMs using less than 50% of requested CPU
+
+=== Show
+
+* Review the dashboard ConfigMap:
++
+[source,role="execute"]
+----
+cat observability/vm-grafana-dashboard.yaml
+----
+
+* Apply the custom dashboard:
++
+[source,role="execute"]
+----
+oc apply -f observability/vm-grafana-dashboard.yaml
+----
+
+* In Grafana, navigate to *Dashboards* → *Custom* and open the *ACM VM Fleet Metrics* dashboard
+
+image::grafana-custom-vm-dashboard.png[Custom VM Fleet Metrics Grafana dashboard]
+
+* Explore each panel and correlate the data with the right-sizing alerts deployed in Part 4
+
+[TIP]
+====
+The dashboard is deployed as a ConfigMap with the label `grafana-custom-dashboard: "true"` which ACM Observability auto-imports into the production Grafana. This means dashboard changes go through Git review -- no manual Grafana UI editing required.
 ====
 
 == Key Takeaways
 
-* `subscription-admin` enables cross-namespace deployment without `cluster-admin`
-* Git becomes the immutable audit trail for all deployment changes
-* ArgoCD and RHACM Subscriptions provide automatic sync and drift correction
-* Developers never need direct CLI access to production clusters
-* Productivity and security are complementary, not competing concerns
+* RHACM Observability provides a single pane of glass for VM metrics across the entire fleet
+* Three dashboard levels (fleet → cluster → VM) enable rapid incident triage
+* Right-sizing metrics replace traditional hypervisor capacity planning tools
+* No per-cluster login or kubeconfig is required for observability
+* Custom metrics allowlists ensure VM-specific telemetry reaches the Hub
+* Custom Thanos Ruler alerts provide proactive notification of over- and under-provisioned VMs
+* Dashboards deployed as ConfigMaps follow the "dashboards as code" GitOps pattern

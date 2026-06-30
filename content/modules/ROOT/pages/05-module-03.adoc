@@ -1,28 +1,33 @@
-= Module 3: Application Topology Views
+= Module 3: VM Policies and Governance
 :source-highlighter: rouge
 :toc: macro
 :toclevels: 1
 
 toc::[]
 
-== Part 1 -- Deploying a VM Application via GitOps
+== Part 1 -- Declarative VM Governance with ACM Policies
 
 === Know
 
-_To demonstrate topology, we first need a VM-based application deployed via GitOps. This uses an ArgoCD ApplicationSet that targets managed clusters based on ACM Placement decisions -- the same mechanism used for production workloads._
+_Traditional VM management relies on manual runbooks and per-cluster configuration. A single missed patch or misconfigured backup schedule across 15 clusters can result in data loss or compliance violations. RHACM eliminates this risk by treating VM governance as code._
 
-The ApplicationSet uses the `clusterDecisionResource` generator, which dynamically resolves which managed clusters to target based on RHACM Placement resources. This means adding or removing clusters from the fleet automatically updates the application deployment -- no manual ArgoCD configuration required.
+**Business Challenge:**
+Organizations running hundreds of VMs across multiple OpenShift clusters have no centralized way to enforce configuration standards. Each cluster team applies policies independently, leading to drift, inconsistent backup schedules, and blind spots in resource utilization.
+
+**Technical Solution:**
+RHACM uses `ConfigurationPolicy` resources to wrap kubevirt.io objects in a declarative governance layer. The policy engine continuously monitors managed clusters and automatically remediates drift -- if a required configuration is deleted or modified, ACM recreates it within seconds.
+
+**Business Value:**
+
+* *Automated compliance* -- policies map directly to NIST SP 800-53 controls (CM-2, CP-9)
+* *Self-healing infrastructure* -- drift is corrected without human intervention
+* *Targeted enforcement* -- policies apply only to clusters labeled `virtualization-enabled: true`
 
 === Show
 
-* Create a namespace for the VM workload on the Hub:
-+
-[source,role="execute"]
-----
-oc create namespace vm-demo-app
-----
+NOTE: The student cluster was already labeled `virtualization-enabled=true` in Module 1. If you skipped Module 1, run: `oc label managedcluster {student_cluster_name} virtualization-enabled=true --overwrite`
 
-* Configure the ACM-ArgoCD integration by creating a `ManagedClusterSetBinding` and `GitOpsCluster` resource. This enables ArgoCD's `clusterDecisionResource` generator to discover managed clusters via ACM Placement:
+* Create a ManagedClusterSetBinding so the Placement can select managed clusters:
 +
 [source,role="execute"]
 ----
@@ -31,162 +36,294 @@ apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
   name: global
-  namespace: openshift-gitops
+  namespace: open-cluster-management-policies
 spec:
   clusterSet: global
----
-apiVersion: cluster.open-cluster-management.io/v1beta1
-kind: Placement
-metadata:
-  name: virt-enabled-clusters
-  namespace: openshift-gitops
-spec:
-  predicates:
-    - requiredClusterSelector:
-        labelSelector:
-          matchLabels:
-            virtualization-enabled: "true"
----
-apiVersion: apps.open-cluster-management.io/v1beta1
-kind: GitOpsCluster
-metadata:
-  name: gitops-cluster
-  namespace: openshift-gitops
-spec:
-  argoServer:
-    cluster: local-cluster
-    argoNamespace: openshift-gitops
-  placementRef:
-    kind: Placement
-    apiGroup: cluster.open-cluster-management.io
-    name: virt-enabled-clusters
-    namespace: openshift-gitops
 EOF
 ----
 
-* Apply the sample ApplicationSet that deploys a Fedora VM to all virtualization-enabled clusters:
+* Create the VM workload namespaces on the managed cluster (the policies in later parts target these namespaces):
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
 +
 [source,role="execute"]
 ----
-cat <<'EOF' | oc apply -f -
-apiVersion: argoproj.io/v1alpha1
-kind: ApplicationSet
-metadata:
-  name: vm-fedora-web
-  namespace: openshift-gitops
-spec:
-  generators:
-    - clusterDecisionResource:
-        configMapRef: acm-placement
-        labelSelector:
-          matchLabels:
-            cluster.open-cluster-management.io/placement: virt-enabled-clusters
-        requeueAfterSeconds: 180
-  template:
-    metadata:
-      name: 'vm-fedora-web-{{name}}'
-    spec:
-      project: default
-      source:
-        repoURL: 'https://github.com/tosin2013/acm-virt-management-demo.git'
-        targetRevision: main
-        path: examples/vm-fedora-web
-      destination:
-        server: '{{server}}'
-        namespace: vm-demo-app
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
-EOF
+oc create namespace vm-production --dry-run=client -o yaml | oc apply -f -
+oc create namespace vm-staging --dry-run=client -o yaml | oc apply -f -
 ----
 
-* Wait for ArgoCD to sync the application to the managed clusters:
+* Return to the Hub terminal:
 +
 [source,role="execute"]
 ----
-oc get applications -n openshift-gitops -l app.kubernetes.io/part-of=vm-fedora-web
+exit
 ----
 
-== Part 2 -- Inspecting the Topology Graph
+* Review the Placement resource that targets virtualization-enabled clusters:
++
+[source,role="execute"]
+----
+oc get placement virt-enabled-clusters -n open-cluster-management-policies -o yaml
+----
+
+* Verify the PlacementDecision shows the expected clusters:
++
+[source,role="execute"]
+----
+oc get placementdecision -n open-cluster-management-policies -l cluster.open-cluster-management.io/placement=virt-enabled-clusters -o yaml
+----
+
+== Part 2 -- VM Right-Sizing Metrics Policy
 
 === Know
 
-_Application Topology is the visual proof that everything works together. After deploying VM-based applications via GitOps and enforcing policies, the topology view shows the complete dependency graph -- which components run where, their real-time status, and how they relate to each other._
+_Right-sizing VMs is one of the primary reasons organizations adopted traditional hypervisor tools like VMware DRS. RHACM brings this capability to Kubernetes-native VM management by deploying Prometheus recording rules that continuously track CPU and memory utilization ratios._
 
-**Business Challenge:**
-In a multicluster environment, understanding "where is my application running and is it healthy?" requires correlating information across multiple cluster consoles, ArgoCD dashboards, and CLI sessions. This is error-prone and slow.
+The `vm-right-sizing-metrics` policy deploys two key components to every virtualization-enabled managed cluster:
 
-**Technical Solution:**
-RHACM's Application Topology view interprets ArgoCD `Application` and `ApplicationSet` objects to render an interactive graph that:
+* *PrometheusRule* with recording rules that calculate `kubevirt:vm_cpu_usage_ratio` and `kubevirt:vm_memory_usage_ratio`
+* *Custom metrics allowlist* that ensures VM metrics are forwarded to the ACM Hub observability stack
 
-* Shows all application components across Hub and managed clusters
-* Displays real-time status (healthy, degraded, missing)
-* Enables remote log retrieval directly from the topology UI
-* Works for both container-based and VM-based workloads
-
-**Business Value:**
-
-* Visual validation of GitOps deployments -- see at a glance if everything landed correctly
-* Remote diagnostics without kubeconfig access -- fetch logs through the UI
-* Cross-cluster dependency mapping -- understand how services connect across clusters
+These metrics power the fleet-wide Grafana dashboards demonstrated in Module 4.
 
 === Show
+
+* Apply the VM right-sizing policy:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-right-sizing-policy.yaml
+oc apply -f policies/placement-binding.yaml
+----
 
 * Navigate to the ACM console at {openshift_console_url}
 
-* Go to *Applications* in the left navigation
+* Go to *Governance* → *Policies* and verify the `vm-right-sizing-metrics` policy shows *Compliant*
 
-* Observe the list of managed applications -- the `vm-fedora-web` ApplicationSet deployed in Part 1 should be visible
+* SSH to the student cluster bastion to verify the resources on the managed cluster:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
 
-image::acm-applications-list.png[ACM Applications list showing vm-fedora-web]
+* Verify the PrometheusRule was created:
++
+[source,role="execute"]
+----
+oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o yaml
+----
 
-* Select `vm-fedora-web` to open the topology graph
+* Verify the recording rules are producing data:
++
+[source,role="execute"]
+----
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'kubevirt:vm_cpu_usage_ratio'
+----
 
-image::acm-topology-graph.png[ACM Topology graph showing VM components across clusters]
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
 
-* The topology graph displays:
-** The ApplicationSet on the Hub
-** The Application instances on each managed cluster
-** The VirtualMachine resources and their status
-** Associated Services, Routes, and DataVolumes
-
-* Click on a VirtualMachine node in the graph to view:
-** Resource details (CPU, memory requests)
-** Current phase (Running, Stopped, Migrating)
-** Events timeline
-
-* Filter the topology by clicking the search/filter icon and typing `vm-fedora-web` to isolate just this application's components
-
-* Toggle between *Graph view* and *List view* to show different perspectives on the same deployment
-
-== Part 3 -- Remote Diagnostics via Topology
+== Part 3 -- VM Backup Enforcement Policy
 
 === Know
 
-_The topology view is the "proof screenshot" for the customer -- it visually confirms that the entire GitOps pipeline works end-to-end, from Git commit to running VM across multiple clusters._
+_Business continuity for VM workloads requires automated, verified backups. The `vm-backup-enforcement` policy ensures that every virtualization-enabled cluster has OADP (OpenShift API for Data Protection) installed and a daily backup schedule configured for critical VM namespaces._
 
-A critical capability to highlight: *remote log retrieval*. Level-1 operators can inspect VM pod logs and diagnose issues (CrashLoopBackOff, boot failures, network misconfigurations) directly from the topology view -- without needing kubeconfig access to the managed cluster. This reinforces the zero-trust operational model from Module 4.
+The policy enforces three layers of backup infrastructure:
+
+1. *OADP Operator subscription* -- ensures the backup tooling is installed
+2. *Backup schedule* -- daily 2:00 AM backups of `vm-production` and `vm-staging` namespaces with CSI snapshots
+3. *DataProtectionApplication* -- configures Velero with the kubevirt plugin for VM-aware backups
+
+If any of these components are deleted or modified, ACM automatically recreates them.
 
 === Show
 
-* In the topology graph, locate a VirtualMachine node and click on its virt-launcher pod
+* Apply the backup enforcement policy:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-backup-enforcement-policy.yaml
+----
 
-* Click *View Logs* on the VM's virt-launcher pod to retrieve remote logs:
+* In the ACM console, navigate to *Governance* → *Policies* and locate `vm-backup-enforcement`
 
-image::acm-topology-vm-logs.png[Remote log retrieval from VM topology view]
+* Click the policy name to view compliance status per cluster
+
+* SSH to the student cluster bastion to verify the resources on the managed cluster:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the backup schedule exists:
++
+[source,role="execute"]
+----
+oc get schedule -n openshift-adp
+----
+
+* *Simulate drift* -- delete the backup schedule and watch ACM remediate:
++
+[source,role="execute"]
+----
+oc delete schedule vm-critical-backup -n openshift-adp
+----
+
+* Wait 30-60 seconds, then verify the schedule was automatically recreated:
++
+[source,role="execute"]
+----
+oc get schedule -n openshift-adp
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
 
 [NOTE]
 ====
-Emphasize to the customer: "You just retrieved logs from a VM running on a remote cluster without having any kubeconfig or direct CLI access to that cluster. The ACM Hub proxied the request securely."
+This self-healing behavior is the core value proposition: infrastructure drift is corrected automatically, eliminating the risk of missed backups due to human error or malicious deletion.
+====
+
+== Part 4 -- VM Network Isolation and Resource Guardrails
+
+=== Know
+
+_In a shared cluster environment, unrestricted network access between VM namespaces creates lateral movement risk. A compromised VM in `vm-staging` could reach production services in `vm-production`. Similarly, a VM created with extreme resource requests (e.g., 64Gi memory on a 32Gi node) can starve other workloads._
+
+**Network Isolation Policy** (`vm-network-isolation`) enforces a default-deny NetworkPolicy in VM namespaces, allowing only:
+
+* Same-namespace pod-to-pod traffic
+* Monitoring scrape from `openshift-monitoring`
+* DNS resolution via `openshift-dns`
+* Outbound HTTP/HTTPS for package updates
+
+**Resource Guardrails Policy** (`vm-resource-guardrails`) enforces a LimitRange in VM namespaces that prevents extreme resource requests:
+
+* Min CPU: 500m, Max CPU: 8 cores
+* Min Memory: 512Mi, Max Memory: 16Gi
+* Default requests: 1 CPU, 1Gi memory
+
+Both policies map to NIST SP 800-53 controls: SC-7 (Boundary Protection) and CM-7 (Least Functionality).
+
+=== Show
+
+* Apply the network isolation and resource guardrails policies:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-network-isolation-policy.yaml
+oc apply -f policies/vm-resource-guardrails-policy.yaml
+----
+
+* Verify the policies are Compliant in the ACM console under *Governance* -> *Policies*
+
+image::acm-governance-policies-compliant.png[ACM Governance showing Compliant policies]
+
+* SSH to the student cluster bastion to verify the resources on the managed cluster:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the NetworkPolicy and LimitRange were created in the VM namespace:
++
+[source,role="execute"]
+----
+oc get networkpolicy -n vm-production
+oc get limitrange -n vm-production
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
+== Part 5 -- VM Eviction Strategy and Security Hardening
+
+=== Know
+
+_Non-migratable VMs with a `LiveMigrate` eviction strategy can block OpenShift upgrades and node maintenance indefinitely. The `vm-eviction-strategy` policy ensures every VM in the fleet is configured for graceful live migration during maintenance windows._
+
+_Additionally, production server VMs rarely need serial console or graphics device access. Leaving these enabled expands the QEMU attack surface unnecessarily. The `vm-security-hardening` policy creates a `VirtualMachineClusterPreference` that disables these interfaces for server workloads._
+
+**Eviction Strategy Policy** -- uses `remediationAction: inform` to detect VMs that lack the `LiveMigrate` eviction strategy without forcefully restarting them. Maps to NIST CP-2 (Contingency Plan).
+
+**Security Hardening Policy** -- creates a `VirtualMachineClusterPreference` named `hardened-server-vm` that disables serial console and graphics device attachment. Maps to NIST SC-28 (Protection of Information at Rest) and CM-6 (Configuration Settings).
+
+=== Show
+
+* Apply the eviction strategy and security hardening policies:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-eviction-strategy-policy.yaml
+oc apply -f policies/vm-security-hardening-policy.yaml
+----
+
+* Verify the policies in the ACM console under *Governance* -> *Policies*
+
+* SSH to the student cluster bastion to verify the hardened VM preference exists:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the VirtualMachineClusterPreference was created:
++
+[source,role="execute"]
+----
+oc get virtualmachineclusterpreferences hardened-server-vm -o yaml
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
+[NOTE]
+====
+When creating new VMs, reference the hardened preference to automatically inherit the security settings: `spec.preference.name: hardened-server-vm`. This provides consistent security posture across the fleet without manual configuration per VM.
 ====
 
 == Key Takeaways
 
-* Application Topology provides visual validation of multicluster GitOps deployments
-* The view works identically for container and VM-based workloads
-* Remote log retrieval enables zero-trust diagnostics without per-cluster credentials
-* ApplicationSets with `clusterDecisionResource` dynamically target clusters via ACM Placement
-* The topology graph spans Hub and managed clusters in a single interactive view
+* ACM `ConfigurationPolicy` treats VM governance as declarative code
+* Policies target only relevant clusters via `Placement` with label selectors
+* Right-sizing metrics enable data-driven capacity planning without traditional hypervisor tools
+* Backup enforcement guarantees business continuity with automated drift remediation
+* Network isolation and resource guardrails prevent lateral movement and noisy-neighbor issues
+* Eviction strategy enforcement protects upgrade and maintenance operations
+* Security hardening reduces the QEMU attack surface for production VMs
+* All policies map to recognized compliance frameworks (NIST SP 800-53)

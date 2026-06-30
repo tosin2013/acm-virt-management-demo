@@ -1,0 +1,63 @@
+---
+- name: Delete Deployment
+  kubernetes.core.k8s:
+    state: absent
+    api_version: apps/v1
+    kind: Deployment
+    name: httpd-fileserver
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+
+- name: Delete Route
+  kubernetes.core.k8s:
+    state: absent
+    api_version: route.openshift.io/v1
+    kind: Route
+    name: "{{ ocp4_workload_httpd_fileserver_service_name }}"
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+
+- name: Delete Service
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Service
+    name: "{{ ocp4_workload_httpd_fileserver_service_name }}"
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+
+- name: Delete BuildConfig
+  kubernetes.core.k8s:
+    state: absent
+    api_version: build.openshift.io/v1
+    kind: BuildConfig
+    name: httpd-fileserver
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+
+- name: Delete ImageStream
+  kubernetes.core.k8s:
+    state: absent
+    api_version: image.openshift.io/v1
+    kind: ImageStream
+    name: httpd-fileserver
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+
+- name: Delete ServiceAccount
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ServiceAccount
+    name: httpd-fileserver
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+
+- name: Delete PVC
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: PersistentVolumeClaim
+    name: "{{ ocp4_workload_httpd_fileserver_service_name }}-data"
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+
+- name: Delete Namespace
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Namespace
+    name: "{{ ocp4_workload_httpd_fileserver_namespace }}"

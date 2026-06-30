@@ -1,0 +1,25 @@
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: httpd-fileserver
+  namespace: {{ ocp4_workload_httpd_fileserver_namespace }}
+  labels:
+    app: httpd-fileserver
+spec:
+  source:
+    type: Git
+    git:
+      uri: {{ ocp4_workload_httpd_fileserver_source_repo }}
+      ref: {{ ocp4_workload_httpd_fileserver_source_ref }}
+    contextDir: {{ ocp4_workload_httpd_fileserver_source_context }}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: httpd-fileserver:latest
+  triggers:
+    - type: ConfigChange

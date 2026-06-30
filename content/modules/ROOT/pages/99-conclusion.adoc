@@ -4,11 +4,17 @@
 
 == What We Demonstrated
 
-This demo proved seven capabilities that together deliver a unified, zero-trust governance framework for virtual machines managed by Red Hat Advanced Cluster Management:
+This demo proved eight capabilities that together deliver a unified, zero-trust governance framework for virtual machines managed by Red Hat Advanced Cluster Management:
 
 [cols="1,2", options="header"]
 |===
 | Capability | What the Customer Saw
+
+| *Deploy VM Workloads*
+| Fleet-scale VM deployment via GitOps ApplicationSets for Linux and ISO-based installation for Windows -- both managed declaratively
+
+| *Application Topology Views*
+| Visual dependency graph spanning Hub and managed clusters, with remote log retrieval for VM workloads -- no kubeconfig required
 
 | *VM Policies and Governance*
 | Self-healing ConfigurationPolicies that enforce VM right-sizing metrics and backup schedules across the fleet -- with automatic drift remediation
@@ -16,8 +22,8 @@ This demo proved seven capabilities that together deliver a unified, zero-trust 
 | *Fleet Observability*
 | A single Grafana dashboard providing fleet-wide, per-cluster, and per-VM metrics -- eliminating per-cluster login for diagnostics
 
-| *Application Topology Views*
-| Visual dependency graph spanning Hub and managed clusters, with remote log retrieval for VM workloads -- no kubeconfig required
+| *VM Right-Sizing Recommendations*
+| Official RHACM 2.16 right-sizing dashboards showing over- and under-provisioned VMs, with a live resize-and-verify workflow
 
 | *Deploy Without Cluster-Admin*
 | GitOps deployment via `subscription-admin` -- deploying VM governance across the fleet while being denied destructive actions
@@ -27,9 +33,6 @@ This demo proved seven capabilities that together deliver a unified, zero-trust 
 
 | *Eradicate Cluster Destruction*
 | Custom ClusterRole with `delete` verb omitted for all cluster lifecycle APIs -- the Kubernetes API server cryptographically denies destruction attempts
-
-| *VM Right-Sizing Recommendations*
-| Official RHACM 2.16 right-sizing dashboards showing over- and under-provisioned VMs, with a live resize-and-verify workflow
 |===
 
 == Business Value Summary

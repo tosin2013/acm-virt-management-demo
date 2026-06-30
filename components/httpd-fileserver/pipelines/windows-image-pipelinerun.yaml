@@ -1,0 +1,20 @@
+---
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: windows-2019-image-build-
+  namespace: httpd-server
+spec:
+  pipelineRef:
+    name: windows-2019-image-build
+  params:
+    - name: iso-url
+      value: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso"
+    - name: disk-size
+      value: "60Gi"
+    - name: iso-size
+      value: "7Gi"
+    - name: vm-name
+      value: "win2019-install"
+    - name: namespace
+      value: "httpd-server"

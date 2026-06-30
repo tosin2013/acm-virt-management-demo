@@ -1,0 +1,20 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ ocp4_workload_httpd_fileserver_service_name }}
+  namespace: {{ ocp4_workload_httpd_fileserver_namespace }}
+  labels:
+    app: httpd-fileserver
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ ocp4_workload_httpd_fileserver_route_timeout }}
+spec:
+  to:
+    kind: Service
+    name: {{ ocp4_workload_httpd_fileserver_service_name }}
+    weight: 100
+  port:
+    targetPort: proxy
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect

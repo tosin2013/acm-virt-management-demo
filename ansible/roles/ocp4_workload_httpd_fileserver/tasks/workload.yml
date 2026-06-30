@@ -1,0 +1,112 @@
+---
+- name: Create namespace
+  kubernetes.core.k8s:
+    state: present
+    template: namespace.yaml.j2
+
+- name: Create ServiceAccount with OAuth redirect
+  kubernetes.core.k8s:
+    state: present
+    template: serviceaccount.yaml.j2
+
+- name: Create PVC
+  kubernetes.core.k8s:
+    state: present
+    template: pvc.yaml.j2
+
+- name: Create ImageStream
+  kubernetes.core.k8s:
+    state: present
+    template: imagestream.yaml.j2
+
+- name: Create BuildConfig
+  kubernetes.core.k8s:
+    state: present
+    template: buildconfig.yaml.j2
+
+- name: Create Service
+  kubernetes.core.k8s:
+    state: present
+    template: service.yaml.j2
+
+- name: Create Route
+  kubernetes.core.k8s:
+    state: present
+    template: route.yaml.j2
+
+- name: Check if image already exists
+  kubernetes.core.k8s_info:
+    api_version: image.openshift.io/v1
+    kind: ImageStreamTag
+    name: httpd-fileserver:latest
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+  register: r_image_tag
+
+- name: Wait for initial build to complete
+  when: r_image_tag.resources | length == 0
+  block:
+    - name: Wait for build to start
+      kubernetes.core.k8s_info:
+        api_version: build.openshift.io/v1
+        kind: Build
+        namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+        label_selectors:
+          - "buildconfig=httpd-fileserver"
+      register: r_builds
+      retries: 12
+      delay: 10
+      until: r_builds.resources | length > 0
+
+    - name: Wait for build to complete
+      kubernetes.core.k8s_info:
+        api_version: build.openshift.io/v1
+        kind: Build
+        namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+        label_selectors:
+          - "buildconfig=httpd-fileserver"
+      register: r_builds
+      retries: 30
+      delay: 20
+      until:
+        - r_builds.resources | length > 0
+        - r_builds.resources[-1].status.phase == "Complete"
+
+- name: Create Deployment
+  kubernetes.core.k8s:
+    state: present
+    template: deployment.yaml.j2
+
+- name: Wait for Deployment rollout
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: httpd-fileserver
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+  register: r_deployment
+  retries: 30
+  delay: 10
+  until:
+    - r_deployment.resources | length > 0
+    - r_deployment.resources[0].status.readyReplicas | default(0) | int > 0
+
+- name: Get Route hostname
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    name: "{{ ocp4_workload_httpd_fileserver_service_name }}"
+    namespace: "{{ ocp4_workload_httpd_fileserver_namespace }}"
+  register: r_route
+
+- name: Set route URL fact
+  ansible.builtin.set_fact:
+    _httpd_fileserver_route_url: >-
+      https://{{ r_route.resources[0].spec.host }}
+    _httpd_fileserver_internal_url: >-
+      http://{{ ocp4_workload_httpd_fileserver_service_name }}.{{ ocp4_workload_httpd_fileserver_namespace }}.svc.cluster.local:8080
+
+- name: Save AgnosticD user data
+  agnosticd.core.agnosticd_user_info:
+    msg: "HTTP File Server deployed at {{ _httpd_fileserver_route_url }}"
+    data:
+      httpd_fileserver_route_url: "{{ _httpd_fileserver_route_url }}"
+      httpd_fileserver_internal_url: "{{ _httpd_fileserver_internal_url }}"

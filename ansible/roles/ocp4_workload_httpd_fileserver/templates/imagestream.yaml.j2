@@ -1,0 +1,8 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: httpd-fileserver
+  namespace: {{ ocp4_workload_httpd_fileserver_namespace }}
+  labels:
+    app: httpd-fileserver

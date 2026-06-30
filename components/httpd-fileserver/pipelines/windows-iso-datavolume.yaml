@@ -1,0 +1,19 @@
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: win2019-iso
+  namespace: httpd-server
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    http:
+      url: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso"
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: gp3-csi
+    resources:
+      requests:
+        storage: 7Gi

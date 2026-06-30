@@ -1,0 +1,10 @@
+---
+ocp4_workload_httpd_fileserver_namespace: httpd-server
+ocp4_workload_httpd_fileserver_pvc_size: 100Gi
+ocp4_workload_httpd_fileserver_storage_class: gp3-csi
+ocp4_workload_httpd_fileserver_service_name: httpd-server
+ocp4_workload_httpd_fileserver_route_timeout: "600s"
+ocp4_workload_httpd_fileserver_source_repo: "https://github.com/tosin2013/acm-virt-management-demo.git"
+ocp4_workload_httpd_fileserver_source_ref: main
+ocp4_workload_httpd_fileserver_source_context: components/httpd-fileserver
+ocp4_workload_httpd_fileserver_cookie_secret: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') | b64encode }}"

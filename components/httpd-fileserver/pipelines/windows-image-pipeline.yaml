@@ -1,0 +1,170 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: windows-2019-image-build
+  namespace: httpd-server
+spec:
+  description: |
+    Builds a Windows Server 2019 VM disk image from an ISO uploaded to the
+    httpd-fileserver. Creates a CDI DataVolume that imports the ISO via HTTP,
+    provisions a blank disk, and creates a VirtualMachine that boots from the
+    ISO to perform installation.
+  params:
+    - name: iso-url
+      type: string
+      default: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2019.iso"
+      description: Cluster-internal URL of the Windows ISO on the file server
+    - name: disk-size
+      type: string
+      default: "60Gi"
+      description: Size of the Windows installation disk
+    - name: iso-size
+      type: string
+      default: "7Gi"
+      description: PVC size for the ISO DataVolume
+    - name: vm-name
+      type: string
+      default: "win2019-install"
+      description: Name of the installation VM
+    - name: namespace
+      type: string
+      default: "httpd-server"
+      description: Target namespace
+  tasks:
+    - name: create-iso-datavolume
+      taskRef:
+        name: windows-create-datavolume
+      params:
+        - name: manifest
+          value: |
+            apiVersion: cdi.kubevirt.io/v1beta1
+            kind: DataVolume
+            metadata:
+              name: win2019-iso
+              namespace: $(params.namespace)
+              annotations:
+                cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+            spec:
+              source:
+                http:
+                  url: "$(params.iso-url)"
+              pvc:
+                accessModes: [ReadWriteOnce]
+                storageClassName: gp3-csi
+                resources:
+                  requests:
+                    storage: $(params.iso-size)
+
+    - name: create-disk-datavolume
+      taskRef:
+        name: windows-create-datavolume
+      params:
+        - name: manifest
+          value: |
+            apiVersion: cdi.kubevirt.io/v1beta1
+            kind: DataVolume
+            metadata:
+              name: win2019-disk
+              namespace: $(params.namespace)
+              annotations:
+                cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+            spec:
+              source:
+                blank: {}
+              pvc:
+                accessModes: [ReadWriteOnce]
+                storageClassName: gp3-csi
+                resources:
+                  requests:
+                    storage: $(params.disk-size)
+
+    - name: create-install-vm
+      runAfter:
+        - create-iso-datavolume
+        - create-disk-datavolume
+      taskRef:
+        name: windows-create-datavolume
+      params:
+        - name: manifest
+          value: |
+            apiVersion: kubevirt.io/v1
+            kind: VirtualMachine
+            metadata:
+              name: $(params.vm-name)
+              namespace: $(params.namespace)
+              labels:
+                app: windows-install
+            spec:
+              running: true
+              template:
+                metadata:
+                  labels:
+                    kubevirt.io/domain: $(params.vm-name)
+                spec:
+                  domain:
+                    cpu:
+                      cores: 4
+                    devices:
+                      disks:
+                        - disk:
+                            bus: virtio
+                          name: installdisk
+                          bootOrder: 2
+                        - cdrom:
+                            bus: sata
+                          name: iso
+                          bootOrder: 1
+                        - cdrom:
+                            bus: sata
+                          name: virtiocontainerdisk
+                      interfaces:
+                        - masquerade: {}
+                          name: default
+                      inputs:
+                        - type: tablet
+                          bus: usb
+                          name: tablet
+                    resources:
+                      requests:
+                        memory: 8Gi
+                    machine:
+                      type: q35
+                    features:
+                      acpi: {}
+                      hyperv:
+                        relaxed: {}
+                        vapic: {}
+                        spinlocks:
+                          spinlocks: 8191
+                  networks:
+                    - name: default
+                      pod: {}
+                  volumes:
+                    - name: installisk
+                      persistentVolumeClaim:
+                        claimName: win2019-disk
+                    - name: iso
+                      persistentVolumeClaim:
+                        claimName: win2019-iso
+                    - name: virtiocontainerdisk
+                      containerDisk:
+                        image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:latest
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: windows-create-datavolume
+  namespace: httpd-server
+spec:
+  description: Apply a Kubernetes manifest (DataVolume, VM, etc.)
+  params:
+    - name: manifest
+      type: string
+      description: YAML manifest to apply
+  steps:
+    - name: apply
+      image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+      script: |
+        #!/bin/sh
+        echo '$(params.manifest)' | oc apply -f -

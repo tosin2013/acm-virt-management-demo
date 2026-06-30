@@ -15,36 +15,40 @@ toc::[]
 | 5 min
 | Verify clusters, ACM console navigation
 
-| Module 1: VM Policies and Governance
+| Module 1: Deploy VM Workloads
+| 10 min
+| Deploy Fedora VM via GitOps, Windows VM via file server and DataVolumes
+
+| Module 2: Application Topology Views
+| 8 min
+| Inspect topology graph, remote log retrieval
+
+| Module 3: VM Policies and Governance
 | 10 min
 | Apply policies, verify compliance, trigger remediation
 
-| Module 2: Fleet Observability
+| Module 4: Fleet Observability
 | 10 min
 | Grafana dashboards, fleet-wide and per-VM metrics
 
-| Module 3: Application Topology Views
-| 8 min
-| Deploy VM app via GitOps, inspect topology, remote logs
-
-| Module 4: Deploy Without Cluster-Admin
-| 8 min
-| Bind subscription-admin, deploy via Git Subscription
-
-| Module 5: Fine-Grained ACM Permissions
-| 8 min
-| Apply ClusterPermission, demonstrate scoped VM access
-
-| Module 6: Eradicate Cluster Destruction
-| 6 min
-| Apply non-destructive role, attempt and fail to delete cluster
-
-| Module 7: VM Right-Sizing Recommendations
+| Module 5: VM Right-Sizing Recommendations
 | 12-15 min
 | Deploy right-sizing policies, explore dashboards, resize a VM based on recommendation
 
+| Module 6: Deploy Without Cluster-Admin
+| 8 min
+| Bind subscription-admin, deploy via Git Subscription
+
+| Module 7: Fine-Grained ACM Permissions
+| 8 min
+| Apply ClusterPermission, demonstrate scoped VM access
+
+| Module 8: Eradicate Cluster Destruction
+| 6 min
+| Apply non-destructive role, attempt and fail to delete cluster
+
 | *Total*
-| *~80-90 min*
+| *~90-100 min*
 |
 |===
 
@@ -178,9 +182,9 @@ The demo environment consists of one *Hub cluster* running RHACM and one *Studen
 |===
 
 [[observability-setup]]
-== Observability Setup (Module 2)
+== Observability Setup (Module 4)
 
-Module 2 (Fleet Observability) requires RHACM Observability which deploys Grafana and Thanos for centralized metrics backed by S3 object storage.
+Module 4 (Fleet Observability) requires RHACM Observability which deploys Grafana and Thanos for centralized metrics backed by S3 object storage.
 
 === Automated Deployment
 

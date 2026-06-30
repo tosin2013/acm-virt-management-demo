@@ -1,0 +1,97 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpd-fileserver
+  namespace: {{ ocp4_workload_httpd_fileserver_namespace }}
+  labels:
+    app: httpd-fileserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpd-fileserver
+  template:
+    metadata:
+      labels:
+        app: httpd-fileserver
+    spec:
+      serviceAccountName: httpd-fileserver
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: oauth-proxy
+          image: registry.redhat.io/openshift4/ose-oauth-proxy-rhel9:latest
+          args:
+            - --https-address=:8443
+            - --provider=openshift
+            - --openshift-service-account=httpd-fileserver
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret={{ ocp4_workload_httpd_fileserver_cookie_secret }}
+            - --cookie-secure=true
+            - --email-domain=*
+          ports:
+            - containerPort: 8443
+              name: proxy
+              protocol: TCP
+          volumeMounts:
+            - name: proxy-tls
+              mountPath: /etc/tls/private
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+        - name: httpd-fileserver
+          image: image-registry.openshift-image-registry.svc:5000/{{ ocp4_workload_httpd_fileserver_namespace }}/httpd-fileserver:latest
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          env:
+            - name: SERVICE_URL
+              value: "http://{{ ocp4_workload_httpd_fileserver_service_name }}.{{ ocp4_workload_httpd_fileserver_namespace }}.svc.cluster.local:8080"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ ocp4_workload_httpd_fileserver_service_name }}-data
+        - name: proxy-tls
+          secret:
+            secretName: httpd-fileserver-proxy-tls

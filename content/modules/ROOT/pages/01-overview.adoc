@@ -31,11 +31,17 @@ Their current challenges:
 
 == Solution
 
-This demo walks through six capabilities that solve each of these problems:
+This demo walks through eight capabilities that solve each of these problems:
 
 [cols="1,2", options="header"]
 |===
 | Module | Problem Solved
+
+| Deploy VM Workloads
+| Deploys Linux and Windows VMs via GitOps and ISO-based installation across the fleet
+
+| Application Topology Views
+| Visual dependency graph with remote log access -- no per-cluster login needed
 
 | VM Policies and Governance
 | Eliminates configuration drift through declarative, self-healing policies
@@ -43,8 +49,8 @@ This demo walks through six capabilities that solve each of these problems:
 | Fleet Observability
 | Provides a single Grafana dashboard for VM metrics across all clusters
 
-| Application Topology Views
-| Visual dependency graph with remote log access -- no per-cluster login needed
+| VM Right-Sizing Recommendations
+| Data-driven resource optimization replacing VMware DRS with transparent Prometheus metrics
 
 | Deploy Without Cluster-Admin
 | GitOps workflows with `subscription-admin` -- deploy everywhere, admin nowhere
@@ -69,10 +75,10 @@ This demo walks through six capabilities that solve each of these problems:
 → OpenShift Virtualization runs KVM-based VMs natively on OpenShift. Migration Toolkit for Virtualization (MTV) provides automated migration from VMware. ACM governance applies identically to migrated VMs.
 
 **"What about compliance and auditing?"**
-→ Module 1 demonstrates policy enforcement mapped to NIST SP 800-53 controls. ACM provides continuous compliance reporting and automated remediation.
+→ Module 3 demonstrates policy enforcement mapped to NIST SP 800-53 controls. ACM provides continuous compliance reporting and automated remediation.
 
 **"Can we do this without disrupting existing teams?"**
-→ Module 4 demonstrates deployment without cluster-admin. Existing team workflows via Git are preserved -- RHACM adds governance on top, not a replacement workflow.
+→ Module 6 demonstrates deployment without cluster-admin. Existing team workflows via Git are preserved -- RHACM adds governance on top, not a replacement workflow.
 
 **"What happens if someone tries to delete a cluster?"**
-→ Module 6 proves this is cryptographically denied by the Kubernetes API server. The operator sees a `Forbidden` error, and the cluster remains intact.
+→ Module 8 proves this is cryptographically denied by the Kubernetes API server. The operator sees a `Forbidden` error, and the cluster remains intact.

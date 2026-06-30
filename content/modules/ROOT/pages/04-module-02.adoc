@@ -1,223 +1,87 @@
-= Module 2: Fleet Observability
+= Module 2: Application Topology Views
 :source-highlighter: rouge
 :toc: macro
 :toclevels: 1
 
 toc::[]
 
-NOTE: This module uses RHACM Observability (Grafana + Thanos backed by S3). The `ocp4_workload_rhacm_observability` role deploys this automatically during provisioning. For manual setup details, see xref:02-details.adoc#observability-setup[Observability Setup].
-
-== Part 1 -- Fleet-Wide VM Observability
+== Part 1 -- Inspecting the Topology Graph
 
 === Know
 
-_In a traditional hypervisor environment, administrators use tools like vCenter to monitor VM health across clusters. In a multicluster OpenShift environment, RHACM Observability aggregates VM metrics from every managed cluster into a centralized Grafana instance on the Hub -- no per-cluster login required._
+_Application Topology is the visual proof that everything works together. After deploying VM-based applications via GitOps in Module 1, the topology view shows the complete dependency graph -- which components run where, their real-time status, and how they relate to each other._
 
 **Business Challenge:**
-When an incident occurs across a fleet of 15 clusters running 200+ VMs, operators must log into each cluster individually to diagnose the problem. This context-switching wastes hours and delays incident resolution.
+In a multicluster environment, understanding "where is my application running and is it healthy?" requires correlating information across multiple cluster consoles, ArgoCD dashboards, and CLI sessions. This is error-prone and slow.
 
 **Technical Solution:**
-RHACM deploys the Cluster Monitoring Operator integration that:
+RHACM's Application Topology view interprets ArgoCD `Application` and `ApplicationSet` objects to render an interactive graph that:
 
-* Aggregates Prometheus metrics from all managed clusters to the Hub
-* Provides native OpenShift Virtualization Grafana dashboards
-* Uses the custom metrics allowlist (deployed by Module 1's policy) to forward kubevirt-specific metrics
+* Shows all application components across Hub and managed clusters
+* Displays real-time status (healthy, degraded, missing)
+* Enables remote log retrieval directly from the topology UI
+* Works for both container-based and VM-based workloads
 
-**Key Dashboards:**
+**Business Value:**
 
-[cols="1,1,2", options="header"]
-|===
-| Dashboard | Granularity | Key Metrics
-
-| Cluster Overview
-| Fleet-wide
-| Total clusters running OCP Virt; VM counts by status (running, stopped, migrating, error); Operator health
-
-| Single Cluster View
-| Per-cluster
-| OCP Virt version; nodes hosting VMs; VM timeline by status and host node
-
-| Resource Utilization
-| Per-node / per-VM
-| CPU usage; memory consumption; network I/O; storage IOPS
-|===
+* Visual validation of GitOps deployments -- see at a glance if everything landed correctly
+* Remote diagnostics without kubeconfig access -- fetch logs through the UI
+* Cross-cluster dependency mapping -- understand how services connect across clusters
 
 === Show
 
-* Open Grafana at {grafana_url}
+* Navigate to the ACM console at {openshift_console_url}
 
-* Navigate to *Dashboards* → *OpenShift Virtualization: Cluster Overview*
+* Go to *Applications* in the left navigation
 
-image::grafana-cluster-overview.png[Grafana Cluster Overview showing fleet-wide VM metrics]
+* Observe the list of managed applications -- the `vm-fedora-web` ApplicationSet deployed in Module 1 should be visible
 
-* Observe the fleet-wide metrics:
-** Total number of clusters running OpenShift Virtualization
-** VM count broken down by status: running, stopped, error, migrating
-** Operator health alerts across the fleet
+image::acm-applications-list.png[ACM Applications list showing vm-fedora-web]
 
-[TIP]
-====
-Point out to the customer: "This single screen replaces logging into 15 clusters individually. Every VM across every cluster is visible here."
-====
+* Select `vm-fedora-web` to open the topology graph
 
-== Part 2 -- Single Cluster Deep Dive
+image::acm-topology-graph.png[ACM Topology graph showing VM components across clusters]
+
+* The topology graph displays:
+** The ApplicationSet on the Hub
+** The Application instances on each managed cluster
+** The VirtualMachine resources and their status
+** Associated Services, Routes, and DataVolumes
+
+* Click on a VirtualMachine node in the graph to view:
+** Resource details (CPU, memory requests)
+** Current phase (Running, Stopped, Migrating)
+** Events timeline
+
+* Filter the topology by clicking the search/filter icon and typing `vm-fedora-web` to isolate just this application's components
+
+* Toggle between *Graph view* and *List view* to show different perspectives on the same deployment
+
+== Part 2 -- Remote Diagnostics via Topology
 
 === Know
 
-_The fleet overview answers "Is anything wrong?" -- the single cluster view answers "What exactly is wrong and where?"_
+_The topology view is the "proof screenshot" for the customer -- it visually confirms that the entire GitOps pipeline works end-to-end, from Git commit to running VM across multiple clusters._
 
-When an operator spots an anomaly in the fleet overview, they click into a specific cluster to see:
-
-* Which physical nodes are hosting VMs
-* Performance timelines for each VM
-* Migration events and their triggers
-* Node-level resource saturation
-
-This drill-down capability eliminates the need for direct `oc` access to managed clusters for diagnostic purposes.
+A critical capability to highlight: *remote log retrieval*. Level-1 operators can inspect VM pod logs and diagnose issues (CrashLoopBackOff, boot failures, network misconfigurations) directly from the topology view -- without needing kubeconfig access to the managed cluster. This reinforces the zero-trust operational model from Module 6.
 
 === Show
 
-* From the Cluster Overview dashboard, click on a managed cluster name to drill into the *Single Cluster View*
+* In the topology graph, locate a VirtualMachine node and click on its virt-launcher pod
 
-* Observe per-node metrics:
-** Number of VMs per node
-** Node CPU and memory utilization
-** VM distribution across nodes
+* Click *View Logs* on the VM's virt-launcher pod to retrieve remote logs:
 
-* Select a specific VM to view its individual metrics:
-** CPU usage over time
-** Memory working set vs. requested
-** Network receive/transmit bytes
-** Storage read/write traffic
+image::acm-topology-vm-logs.png[Remote log retrieval from VM topology view]
 
-* Alternatively, query VM metrics directly from the Hub:
-+
-[source,role="execute"]
-----
-oc exec -n open-cluster-management-observability deploy/observability-thanos-query -c thanos-query -- \
-  curl -s 'http://localhost:9090/api/v1/query?query=kubevirt:vm_cpu_usage_ratio' | python3 -m json.tool
-----
-
-== Part 3 -- Identifying Right-Sizing Opportunities
-
-=== Know
-
-_The recording rules deployed by Module 1 calculate usage-to-request ratios for every VM. These ratios surface over-provisioned VMs (wasting resources) and under-provisioned VMs (risking OOM kills or CPU throttling)._
-
-The alerts configured in the right-sizing policy trigger when:
-
-* *VMOverProvisionedCPU* -- a VM uses less than 10% of its requested CPU for 24 hours
-* *VMUnderProvisionedMemory* -- a VM uses more than 90% of its requested memory for 1 hour
-
-These alerts appear in both the Grafana dashboards and the ACM Governance view.
-
-=== Show
-
-image::grafana-resource-utilization.png[Grafana Resource Utilization dashboard with per-VM metrics]
-
-* In Grafana, navigate to the *Resource Utilization* dashboard
-
-* Filter by a managed cluster and look for VMs where:
-** CPU usage ratio is below 0.1 (over-provisioned)
-** Memory usage ratio is above 0.9 (under-provisioned)
-
-* Check for active right-sizing alerts in the ACM console:
-** Navigate to *Infrastructure* → *Clusters* → select a managed cluster → *Add-ons*
-** Or query the managed cluster directly:
-+
-[source,role="execute"]
-----
-oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o jsonpath='{.spec.groups[0].rules[?(@.alert)].alert}'
-----
-
-[IMPORTANT]
+[NOTE]
 ====
-**Key insight for the customer:** This is the Kubernetes-native equivalent of VMware DRS. Instead of a proprietary black-box algorithm, you get transparent Prometheus-based metrics that integrate with your existing monitoring stack and alerting workflows.
-====
-
-== Part 4 -- Deploy Custom VM Alerts
-
-=== Know
-
-_Built-in dashboards show what is happening now. Custom alerts notify you before a problem becomes an incident. In this part, you deploy Thanos Ruler custom rules that fire alerts when VMs are consistently over-provisioned or under-provisioned -- the same metrics from Module 1, now with proactive notification._
-
-The `thanos-ruler-custom-rules` ConfigMap defines two alerts:
-
-* *VMOverProvisionedCPU* -- fires after 1 hour when a VM uses less than 10% of requested CPU (severity: info)
-* *VMUnderProvisionedMemory* -- fires after 30 minutes when a VM uses more than 90% of requested memory (severity: warning)
-
-=== Show
-
-* Review the custom alert rules:
-+
-[source,role="execute"]
-----
-cat observability/vm-custom-alerts.yaml
-----
-
-* Apply the custom alert ConfigMap to the observability namespace:
-+
-[source,role="execute"]
-----
-oc apply -f observability/vm-custom-alerts.yaml
-----
-
-* In Grafana, navigate to *Alerting* to verify the alert rules are loaded
-
-* Check for active alerts using the Thanos Query API:
-+
-[source,role="execute"]
-----
-oc exec -n open-cluster-management-observability deploy/observability-thanos-query -c thanos-query -- \
-  curl -s 'http://localhost:9090/api/v1/query?query=ALERTS' | python3 -m json.tool
-----
-
-== Part 5 -- Deploy a Custom VM Fleet Dashboard
-
-=== Know
-
-_While the built-in dashboards provide general OpenShift Virtualization metrics, a custom dashboard tailored to your fleet's VM governance policies provides a single view that connects Module 1's policies to Module 2's observability. This is the "dashboards as code" approach -- the dashboard definition lives in Git alongside your policies._
-
-The `vm-grafana-dashboard` ConfigMap contains a custom Grafana dashboard with four panels:
-
-* *VM Count by Status* -- fleet-wide VM count (running, stopped, error)
-* *VM CPU Usage Ratio by Cluster* -- average CPU utilization ratio per cluster
-* *VM Memory Usage Ratio by Cluster* -- average memory utilization ratio per cluster
-* *Top 10 Over-Provisioned VMs* -- VMs using less than 50% of requested CPU
-
-=== Show
-
-* Review the dashboard ConfigMap:
-+
-[source,role="execute"]
-----
-cat observability/vm-grafana-dashboard.yaml
-----
-
-* Apply the custom dashboard:
-+
-[source,role="execute"]
-----
-oc apply -f observability/vm-grafana-dashboard.yaml
-----
-
-* In Grafana, navigate to *Dashboards* → *Custom* and open the *ACM VM Fleet Metrics* dashboard
-
-image::grafana-custom-vm-dashboard.png[Custom VM Fleet Metrics Grafana dashboard]
-
-* Explore each panel and correlate the data with the right-sizing alerts deployed in Part 4
-
-[TIP]
-====
-The dashboard is deployed as a ConfigMap with the label `grafana-custom-dashboard: "true"` which ACM Observability auto-imports into the production Grafana. This means dashboard changes go through Git review -- no manual Grafana UI editing required.
+Emphasize to the customer: "You just retrieved logs from a VM running on a remote cluster without having any kubeconfig or direct CLI access to that cluster. The ACM Hub proxied the request securely."
 ====
 
 == Key Takeaways
 
-* RHACM Observability provides a single pane of glass for VM metrics across the entire fleet
-* Three dashboard levels (fleet → cluster → VM) enable rapid incident triage
-* Right-sizing metrics replace traditional hypervisor capacity planning tools
-* No per-cluster login or kubeconfig is required for observability
-* Custom metrics allowlists ensure VM-specific telemetry reaches the Hub
-* Custom Thanos Ruler alerts provide proactive notification of over- and under-provisioned VMs
-* Dashboards deployed as ConfigMaps follow the "dashboards as code" GitOps pattern
+* Application Topology provides visual validation of multicluster GitOps deployments
+* The view works identically for container and VM-based workloads
+* Remote log retrieval enables zero-trust diagnostics without per-cluster credentials
+* ApplicationSets with `clusterDecisionResource` dynamically target clusters via ACM Placement
+* The topology graph spans Hub and managed clusters in a single interactive view
