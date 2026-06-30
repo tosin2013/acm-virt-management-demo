@@ -7,4 +7,5 @@
 * xref:06-module-04.adoc[Module 4: Deploy Without Cluster-Admin]
 * xref:07-module-05.adoc[Module 5: Fine-Grained ACM Permissions]
 * xref:08-module-06.adoc[Module 6: Eradicate Cluster Destruction]
+* xref:09-module-07.adoc[Module 7: VM Right-Sizing Recommendations]
 * xref:99-conclusion.adoc[Conclusion and Next Steps]

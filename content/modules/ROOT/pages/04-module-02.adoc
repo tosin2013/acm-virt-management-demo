@@ -48,6 +48,8 @@ RHACM deploys the Cluster Monitoring Operator integration that:
 
 * Navigate to *Dashboards* → *OpenShift Virtualization: Cluster Overview*
 
+image::grafana-cluster-overview.png[Grafana Cluster Overview showing fleet-wide VM metrics]
+
 * Observe the fleet-wide metrics:
 ** Total number of clusters running OpenShift Virtualization
 ** VM count broken down by status: running, stopped, error, migrating
@@ -93,9 +95,7 @@ This drill-down capability eliminates the need for direct `oc` access to managed
 [source,role="execute"]
 ----
 oc exec -n open-cluster-management-observability observatorium-thanos-query-0 -c thanos-query -- \
-  thanos query instant \
-  --http-address=http://localhost:9090 \
-  'kubevirt:vm_cpu_usage_ratio'
+  curl -s 'http://localhost:9090/api/v1/query?query=kubevirt:vm_cpu_usage_ratio' | python3 -m json.tool
 ----
 
 == Part 3 -- Identifying Right-Sizing Opportunities
@@ -112,6 +112,8 @@ The alerts configured in the right-sizing policy trigger when:
 These alerts appear in both the Grafana dashboards and the ACM Governance view.
 
 === Show
+
+image::grafana-resource-utilization.png[Grafana Resource Utilization dashboard with per-VM metrics]
 
 * In Grafana, navigate to the *Resource Utilization* dashboard
 
@@ -133,6 +135,83 @@ oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o jsonpath=
 **Key insight for the customer:** This is the Kubernetes-native equivalent of VMware DRS. Instead of a proprietary black-box algorithm, you get transparent Prometheus-based metrics that integrate with your existing monitoring stack and alerting workflows.
 ====
 
+== Part 4 -- Deploy Custom VM Alerts
+
+=== Know
+
+_Built-in dashboards show what is happening now. Custom alerts notify you before a problem becomes an incident. In this part, you deploy Thanos Ruler custom rules that fire alerts when VMs are consistently over-provisioned or under-provisioned -- the same metrics from Module 1, now with proactive notification._
+
+The `thanos-ruler-custom-rules` ConfigMap defines two alerts:
+
+* *VMOverProvisionedCPU* -- fires after 1 hour when a VM uses less than 10% of requested CPU (severity: info)
+* *VMUnderProvisionedMemory* -- fires after 30 minutes when a VM uses more than 90% of requested memory (severity: warning)
+
+=== Show
+
+* Review the custom alert rules:
++
+[source,role="execute"]
+----
+cat observability/vm-custom-alerts.yaml
+----
+
+* Apply the custom alert ConfigMap to the observability namespace:
++
+[source,role="execute"]
+----
+oc apply -f observability/vm-custom-alerts.yaml
+----
+
+* In Grafana, navigate to *Alerting* to verify the alert rules are loaded
+
+* Check for active alerts using the Thanos Query API:
++
+[source,role="execute"]
+----
+oc exec -n open-cluster-management-observability observatorium-thanos-query-0 -c thanos-query -- \
+  curl -s 'http://localhost:9090/api/v1/query?query=ALERTS' | python3 -m json.tool
+----
+
+== Part 5 -- Deploy a Custom VM Fleet Dashboard
+
+=== Know
+
+_While the built-in dashboards provide general OpenShift Virtualization metrics, a custom dashboard tailored to your fleet's VM governance policies provides a single view that connects Module 1's policies to Module 2's observability. This is the "dashboards as code" approach -- the dashboard definition lives in Git alongside your policies._
+
+The `vm-grafana-dashboard` ConfigMap contains a custom Grafana dashboard with four panels:
+
+* *VM Count by Status* -- fleet-wide VM count (running, stopped, error)
+* *VM CPU Usage Ratio by Cluster* -- average CPU utilization ratio per cluster
+* *VM Memory Usage Ratio by Cluster* -- average memory utilization ratio per cluster
+* *Top 10 Over-Provisioned VMs* -- VMs using less than 50% of requested CPU
+
+=== Show
+
+* Review the dashboard ConfigMap:
++
+[source,role="execute"]
+----
+cat observability/vm-grafana-dashboard.yaml
+----
+
+* Apply the custom dashboard:
++
+[source,role="execute"]
+----
+oc apply -f observability/vm-grafana-dashboard.yaml
+----
+
+* In Grafana, navigate to *Dashboards* → *Custom* and open the *ACM VM Fleet Metrics* dashboard
+
+image::grafana-custom-vm-dashboard.png[Custom VM Fleet Metrics Grafana dashboard]
+
+* Explore each panel and correlate the data with the right-sizing alerts deployed in Part 4
+
+[TIP]
+====
+The dashboard is deployed as a ConfigMap with the label `grafana-custom-dashboard: "true"` which ACM Observability auto-imports into the production Grafana. This means dashboard changes go through Git review -- no manual Grafana UI editing required.
+====
+
 == Key Takeaways
 
 * RHACM Observability provides a single pane of glass for VM metrics across the entire fleet
@@ -140,3 +219,5 @@ oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o jsonpath=
 * Right-sizing metrics replace traditional hypervisor capacity planning tools
 * No per-cluster login or kubeconfig is required for observability
 * Custom metrics allowlists ensure VM-specific telemetry reaches the Hub
+* Custom Thanos Ruler alerts provide proactive notification of over- and under-provisioned VMs
+* Dashboards deployed as ConfigMaps follow the "dashboards as code" GitOps pattern

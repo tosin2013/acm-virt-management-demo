@@ -39,6 +39,21 @@ oc label managedcluster {student_cluster_name} virtualization-enabled=true --ove
 oc get managedclusters -l virtualization-enabled=true
 ----
 
+* Create a ManagedClusterSetBinding so the Placement can select managed clusters:
++
+[source,role="execute"]
+----
+cat <<'EOF' | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: open-cluster-management-policies
+spec:
+  clusterSet: global
+EOF
+----
+
 * Review the Placement resource that targets virtualization-enabled clusters:
 +
 [source,role="execute"]
@@ -80,7 +95,16 @@ oc apply -f policies/placement-binding.yaml
 
 * Go to *Governance* → *Policies* and verify the `vm-right-sizing-metrics` policy shows *Compliant*
 
-* On a managed cluster, verify the PrometheusRule was created:
+* SSH to the student cluster bastion to verify the resources on the managed cluster:
++
+[source,role="execute"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the PrometheusRule was created:
 +
 [source,role="execute"]
 ----
@@ -93,6 +117,13 @@ oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o yaml
 ----
 oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
   promtool query instant http://localhost:9090 'kubevirt:vm_cpu_usage_ratio'
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
 ----
 
 == Part 3 -- VM Backup Enforcement Policy
@@ -122,7 +153,16 @@ oc apply -f policies/vm-backup-enforcement-policy.yaml
 
 * Click the policy name to view compliance status per cluster
 
-* On a managed cluster, verify the backup schedule exists:
+* SSH to the student cluster bastion to verify the resources on the managed cluster:
++
+[source,role="execute"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the backup schedule exists:
 +
 [source,role="execute"]
 ----
@@ -143,9 +183,127 @@ oc delete schedule vm-critical-backup -n openshift-adp
 oc get schedule -n openshift-adp
 ----
 
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
 [NOTE]
 ====
 This self-healing behavior is the core value proposition: infrastructure drift is corrected automatically, eliminating the risk of missed backups due to human error or malicious deletion.
+====
+
+== Part 4 -- VM Network Isolation and Resource Guardrails
+
+=== Know
+
+_In a shared cluster environment, unrestricted network access between VM namespaces creates lateral movement risk. A compromised VM in `vm-staging` could reach production services in `vm-production`. Similarly, a VM created with extreme resource requests (e.g., 64Gi memory on a 32Gi node) can starve other workloads._
+
+**Network Isolation Policy** (`vm-network-isolation`) enforces a default-deny NetworkPolicy in VM namespaces, allowing only:
+
+* Same-namespace pod-to-pod traffic
+* Monitoring scrape from `openshift-monitoring`
+* DNS resolution via `openshift-dns`
+* Outbound HTTP/HTTPS for package updates
+
+**Resource Guardrails Policy** (`vm-resource-guardrails`) enforces a LimitRange in VM namespaces that prevents extreme resource requests:
+
+* Min CPU: 500m, Max CPU: 8 cores
+* Min Memory: 512Mi, Max Memory: 16Gi
+* Default requests: 1 CPU, 1Gi memory
+
+Both policies map to NIST SP 800-53 controls: SC-7 (Boundary Protection) and CM-7 (Least Functionality).
+
+=== Show
+
+* Apply the network isolation and resource guardrails policies:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-network-isolation-policy.yaml
+oc apply -f policies/vm-resource-guardrails-policy.yaml
+----
+
+* Verify the policies are Compliant in the ACM console under *Governance* -> *Policies*
+
+image::acm-governance-policies-compliant.png[ACM Governance showing Compliant policies]
+
+* SSH to the student cluster bastion to verify the resources on the managed cluster:
++
+[source,role="execute"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the NetworkPolicy and LimitRange were created in the VM namespace:
++
+[source,role="execute"]
+----
+oc get networkpolicy -n vm-production
+oc get limitrange -n vm-production
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
+== Part 5 -- VM Eviction Strategy and Security Hardening
+
+=== Know
+
+_Non-migratable VMs with a `LiveMigrate` eviction strategy can block OpenShift upgrades and node maintenance indefinitely. The `vm-eviction-strategy` policy ensures every VM in the fleet is configured for graceful live migration during maintenance windows._
+
+_Additionally, production server VMs rarely need serial console or graphics device access. Leaving these enabled expands the QEMU attack surface unnecessarily. The `vm-security-hardening` policy creates a `VirtualMachineClusterPreference` that disables these interfaces for server workloads._
+
+**Eviction Strategy Policy** -- uses `remediationAction: inform` to detect VMs that lack the `LiveMigrate` eviction strategy without forcefully restarting them. Maps to NIST CP-2 (Contingency Plan).
+
+**Security Hardening Policy** -- creates a `VirtualMachineClusterPreference` named `hardened-server-vm` that disables serial console and graphics device attachment. Maps to NIST SC-28 (Protection of Information at Rest) and CM-6 (Configuration Settings).
+
+=== Show
+
+* Apply the eviction strategy and security hardening policies:
++
+[source,role="execute"]
+----
+oc apply -f policies/vm-eviction-strategy-policy.yaml
+oc apply -f policies/vm-security-hardening-policy.yaml
+----
+
+* Verify the policies in the ACM console under *Governance* -> *Policies*
+
+* SSH to the student cluster bastion to verify the hardened VM preference exists:
++
+[source,role="execute"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the VirtualMachineClusterPreference was created:
++
+[source,role="execute"]
+----
+oc get virtualmachineclusterpreferences hardened-server-vm -o yaml
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
+[NOTE]
+====
+When creating new VMs, reference the hardened preference to automatically inherit the security settings: `spec.preference.name: hardened-server-vm`. This provides consistent security posture across the fleet without manual configuration per VM.
 ====
 
 == Key Takeaways
@@ -154,4 +312,7 @@ This self-healing behavior is the core value proposition: infrastructure drift i
 * Policies target only relevant clusters via `Placement` with label selectors
 * Right-sizing metrics enable data-driven capacity planning without traditional hypervisor tools
 * Backup enforcement guarantees business continuity with automated drift remediation
+* Network isolation and resource guardrails prevent lateral movement and noisy-neighbor issues
+* Eviction strategy enforcement protects upgrade and maintenance operations
+* Security hardening reduces the QEMU attack surface for production VMs
 * All policies map to recognized compliance frameworks (NIST SP 800-53)

@@ -14,6 +14,7 @@ A Red Hat Showroom demo covering multicluster governance and virtualization life
 4. **Deploy Without Cluster-Admin** -- GitOps workflows using `subscription-admin`
 5. **Fine-Grained ACM Permissions** -- ClusterPermission API for scoped kubevirt.io roles
 6. **Eradicate Cluster Destruction** -- Custom RBAC preventing managed cluster deletion
+7. **VM Right-Sizing Recommendations** -- Official RHACM 2.16 right-sizing dashboards with observe-resize-verify workflow
 
 ## Structure
 
@@ -21,6 +22,7 @@ A Red Hat Showroom demo covering multicluster governance and virtualization life
 content/          Antora/AsciiDoc Showroom lab content
 policies/         ACM policy manifests (GitOps-ready)
 rbac/             RBAC manifests (ClusterRole, ClusterPermission)
+right-sizing/     ACM right-sizing policies and Grafana dashboard ConfigMaps
 ```
 
 ## Local Preview

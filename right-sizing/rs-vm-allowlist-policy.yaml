@@ -1,0 +1,54 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: rs-vm-metrics-allowlist
+  namespace: open-cluster-management-policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: rs-vm-observability-allowlist
+        spec:
+          remediationAction: enforce
+          severity: low
+          namespaceSelector:
+            include:
+              - open-cluster-management-addon-observability
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                  name: observability-metrics-custom-allowlist
+                  namespace: open-cluster-management-addon-observability
+                data:
+                  metrics_list.yaml: |
+                    names:
+                      - kubevirt_vmi_cpu_usage_seconds_total
+                      - kubevirt_vmi_memory_available_bytes
+                      - kubevirt_vmi_memory_usable_bytes
+                      - kubevirt_vm_resource_requests
+                      - kubevirt_vm_running_status_last_transition_timestamp_seconds
+                      - kubevirt_vmi_memory_working_set_bytes
+                      - kubevirt_vmi_network_receive_bytes_total
+                      - kubevirt_vmi_network_transmit_bytes_total
+                      - kubevirt_vmi_storage_read_traffic_bytes_total
+                      - kubevirt_vmi_storage_write_traffic_bytes_total
+                      - kubevirt_vmi_phase_count
+                      - acm_rs_vm:cpu_usage_max_5m
+                      - acm_rs_vm:cpu_request
+                      - acm_rs_vm:cpu_overestimation
+                      - acm_rs_vm:cpu_underestimation
+                      - acm_rs_vm:memory_usage_max_5m
+                      - acm_rs_vm:memory_request
+                      - acm_rs_vm:memory_overestimation
+                      - acm_rs_vm:memory_underestimation

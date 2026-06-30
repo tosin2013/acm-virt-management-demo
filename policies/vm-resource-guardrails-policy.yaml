@@ -1,0 +1,47 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: vm-resource-guardrails
+  namespace: open-cluster-management-policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-7 Least Functionality
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: vm-resource-limits
+        spec:
+          remediationAction: enforce
+          severity: medium
+          namespaceSelector:
+            include:
+              - vm-production
+              - vm-staging
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: LimitRange
+                metadata:
+                  name: vm-resource-limits
+                spec:
+                  limits:
+                    - type: Container
+                      min:
+                        cpu: 500m
+                        memory: 512Mi
+                      max:
+                        cpu: "8"
+                        memory: 16Gi
+                      default:
+                        cpu: "2"
+                        memory: 2Gi
+                      defaultRequest:
+                        cpu: "1"
+                        memory: 1Gi

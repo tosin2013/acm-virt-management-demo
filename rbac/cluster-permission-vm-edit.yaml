@@ -2,7 +2,7 @@ apiVersion: rbac.open-cluster-management.io/v1alpha1
 kind: ClusterPermission
 metadata:
   name: vm-editor-permission
-  namespace: managed-cluster-01
+  namespace: student-1
   labels:
     app.kubernetes.io/part-of: acm-virt-management-demo
 spec:

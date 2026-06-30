@@ -4,7 +4,7 @@
 
 == What We Demonstrated
 
-This demo proved six capabilities that together deliver a unified, zero-trust governance framework for virtual machines managed by Red Hat Advanced Cluster Management:
+This demo proved seven capabilities that together deliver a unified, zero-trust governance framework for virtual machines managed by Red Hat Advanced Cluster Management:
 
 [cols="1,2", options="header"]
 |===
@@ -27,6 +27,9 @@ This demo proved six capabilities that together deliver a unified, zero-trust go
 
 | *Eradicate Cluster Destruction*
 | Custom ClusterRole with `delete` verb omitted for all cluster lifecycle APIs -- the Kubernetes API server cryptographically denies destruction attempts
+
+| *VM Right-Sizing Recommendations*
+| Official RHACM 2.16 right-sizing dashboards showing over- and under-provisioned VMs, with a live resize-and-verify workflow
 |===
 
 == Business Value Summary

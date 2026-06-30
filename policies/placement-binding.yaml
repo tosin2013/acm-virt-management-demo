@@ -22,27 +22,81 @@ kind: PlacementBinding
 metadata:
   name: vm-right-sizing-placement
   namespace: open-cluster-management-policies
-spec:
-  placementRef:
-    name: virt-enabled-clusters
-    apiGroup: cluster.open-cluster-management.io
-    kind: Placement
-  subjects:
-    - name: vm-right-sizing-metrics
-      apiGroup: policy.open-cluster-management.io
-      kind: Policy
+placementRef:
+  name: virt-enabled-clusters
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: vm-right-sizing-metrics
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy
 ---
 apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
 metadata:
   name: vm-backup-placement
   namespace: open-cluster-management-policies
-spec:
-  placementRef:
-    name: virt-enabled-clusters
-    apiGroup: cluster.open-cluster-management.io
-    kind: Placement
-  subjects:
-    - name: vm-backup-enforcement
-      apiGroup: policy.open-cluster-management.io
-      kind: Policy
+placementRef:
+  name: virt-enabled-clusters
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: vm-backup-enforcement
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: vm-network-isolation-placement
+  namespace: open-cluster-management-policies
+placementRef:
+  name: virt-enabled-clusters
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: vm-network-isolation
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: vm-eviction-strategy-placement
+  namespace: open-cluster-management-policies
+placementRef:
+  name: virt-enabled-clusters
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: vm-eviction-strategy
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: vm-resource-guardrails-placement
+  namespace: open-cluster-management-policies
+placementRef:
+  name: virt-enabled-clusters
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: vm-resource-guardrails
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: vm-security-hardening-placement
+  namespace: open-cluster-management-policies
+placementRef:
+  name: virt-enabled-clusters
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+subjects:
+  - name: vm-security-hardening
+    apiGroup: policy.open-cluster-management.io
+    kind: Policy

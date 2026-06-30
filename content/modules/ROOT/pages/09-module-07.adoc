@@ -1,0 +1,137 @@
+= Module 7: VM Right-Sizing Recommendations
+:source-highlighter: rouge
+:toc: macro
+:toclevels: 1
+
+toc::[]
+
+== Part 1 -- Why Right-Sizing Matters
+
+=== Know
+
+_In VMware environments, DRS (Distributed Resource Scheduler) automatically balances VM resource allocation across a cluster. When migrating to OpenShift Virtualization, organizations lose this built-in intelligence -- until now. RHACM 2.16 delivers GA right-sizing as the Kubernetes-native equivalent, using transparent Prometheus-based metrics instead of a proprietary black-box algorithm._
+
+**Business Challenge:**
+Organizations migrating from VMware consistently over-allocate VM resources "just in case." Without a data-driven feedback loop, teams request 4 GiB of memory for workloads that use 400 MiB, and 4 vCPUs for single-threaded services. This waste compounds across hundreds of VMs and dozens of clusters -- inflating infrastructure costs while starving other workloads of capacity.
+
+**Technical Solution:**
+RHACM 2.16 right-sizing provides three dashboard levels that progressively drill down into resource efficiency:
+
+[cols="1,1,2", options="header"]
+|===
+| Dashboard Level | Granularity | What It Shows
+
+| Fleet Overview
+| All clusters
+| Total overestimation and underestimation counts across the managed fleet
+
+| Namespace View
+| Per-namespace
+| Aggregated resource waste grouped by namespace with configurable time windows (15d / 30d)
+
+| Per-VM Detail
+| Individual VM
+| Time-series CPU and memory usage vs. requests, with overestimation and underestimation flags
+|===
+
+**Metrics Architecture:**
+The dashboards are powered by `acm_rs_vm:*` metric families -- Prometheus recording rules deployed to managed clusters via ACM Policies. These recording rules pre-compute usage-to-request ratios so the dashboards load instantly even at fleet scale.
+
+**Business Value:**
+
+* *Data-driven capacity planning* -- replace guesswork with actual usage data across the fleet
+* *Cost optimization* -- identify and reclaim over-allocated resources systematically
+* *Performance protection* -- flag under-provisioned VMs before users experience OOM kills or CPU throttling
+* *VMware DRS replacement* -- GA Kubernetes-native alternative using open Prometheus standards
+
+== Part 2 -- Deploy Right-Sizing Policies and Dashboards
+
+=== Show
+
+* Review the recording rule policy that deploys the `acm_rs_vm:*` Prometheus recording rules to managed clusters:
++
+[source,role="execute"]
+----
+cat right-sizing/rs-vm-rules-policy.yaml
+----
+
+* Apply the right-sizing policies and PolicySet:
++
+[source,role="execute"]
+----
+oc apply -f right-sizing/rs-vm-rules-policy.yaml
+oc apply -f right-sizing/rs-vm-allowlist-policy.yaml
+oc apply -f right-sizing/rs-vm-policyset.yaml
+----
+
+* Verify all right-sizing policies are Compliant:
++
+[source,role="execute"]
+----
+oc get policy -n open-cluster-management-policies -l policy.open-cluster-management.io/policy-set=rs-vm-policyset
+----
++
+All policies should show `Compliant` status within a few minutes.
+
+* Deploy the Grafana dashboards:
++
+[source,role="execute"]
+----
+oc apply -f right-sizing/vm-right-sizing-dashboard-main.yaml
+oc apply -f right-sizing/vm-right-sizing-dashboard-overestimation.yaml
+oc apply -f right-sizing/vm-right-sizing-dashboard-underestimation.yaml
+----
+
+* Navigate to Grafana at {grafana_url} → search for *"ACM Right Sizing Openshift Virtualization Dashboard"*
+
+image::right-sizing-main-dashboard.png[ACM Right Sizing main dashboard showing VM fleet metrics]
+
+[TIP]
+====
+Point out to the customer: "This is the VMware DRS replacement -- but instead of a proprietary algorithm, you get transparent Prometheus metrics that integrate with your existing monitoring and alerting stack."
+====
+
+== Part 3 -- Identify and Act on a Right-Sizing Recommendation
+
+=== Show
+
+* In the right-sizing dashboard, filter by cluster and locate the *fedora-web* VM deployed in Module 3
+
+* Observe the overestimation flag: the VM requests 2Gi memory but the httpd workload uses far less -- memory overestimation is flagged by the recording rules
+
+* Click the VM name to drill into the detailed per-VM view showing time-series usage vs. requests
+
+image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing memory overestimation for fedora-web]
+
+* Act on the recommendation -- resize the VM to match actual usage:
++
+[source,role="execute"]
+----
+oc patch virtualmachine fedora-web -n vm-demo-app --type=merge -p '{"spec":{"template":{"spec":{"domain":{"resources":{"requests":{"memory":"512Mi"}}}}}}}'
+----
+
+* Verify the VM restarts with the new memory size:
++
+[source,role="execute"]
+----
+oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.spec.domain.resources.requests.memory}'
+----
++
+Expected output: `512Mi`
+
+* Wait for the right-sizing metrics to update. The recording rules run at 5-minute intervals, so allow a few minutes for the dashboards to reflect the change. Return to the right-sizing dashboard and observe the reduced overestimation.
+
+image::right-sizing-post-resize.png[Right-sizing dashboard showing reduced overestimation after resize]
+
+[IMPORTANT]
+====
+**Deliver this message to the customer:** "You just completed the full right-sizing loop: observe overestimation in the dashboard, resize the VM based on data, and verify the improvement -- all without leaving the RHACM ecosystem. This is the same workflow at scale across hundreds of VMs and dozens of clusters."
+====
+
+== Key Takeaways
+
+* RHACM 2.16 right-sizing is the GA Kubernetes-native replacement for VMware DRS
+* Three-level drill-down: fleet → namespace → per-VM with configurable aggregation windows (15d / 30d)
+* The complete right-sizing loop: observe overestimation → resize → verify improvement
+* All deployed via ACM Policies -- the same governance-as-code pattern from Module 1
+* Right-sizing integrates with the custom alerts from Module 2 for proactive notification

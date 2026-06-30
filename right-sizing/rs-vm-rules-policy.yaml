@@ -1,0 +1,76 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: rs-vm-recording-rules
+  namespace: open-cluster-management-policies
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+spec:
+  remediationAction: enforce
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: rs-vm-prometheus-recording-rules
+        spec:
+          remediationAction: enforce
+          severity: medium
+          namespaceSelector:
+            include:
+              - openshift-monitoring
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: monitoring.coreos.com/v1
+                kind: PrometheusRule
+                metadata:
+                  name: acm-rs-vm-recording-rules
+                  namespace: openshift-monitoring
+                  labels:
+                    prometheus: k8s
+                    role: alert-rules
+                spec:
+                  groups:
+                    - name: acm.rs.vm.rules
+                      interval: 300s
+                      rules:
+                        - record: acm_rs_vm:cpu_usage_max_5m
+                          expr: |
+                            max_over_time(
+                              (sum by (name, namespace, cluster) (
+                                rate(kubevirt_vmi_cpu_usage_seconds_total[5m])
+                              ))[5m:1m]
+                            )
+                        - record: acm_rs_vm:cpu_request
+                          expr: |
+                            sum by (name, namespace, cluster) (
+                              kubevirt_vm_resource_requests{resource="cpu"}
+                            )
+                        - record: acm_rs_vm:cpu_overestimation
+                          expr: |
+                            acm_rs_vm:cpu_request - acm_rs_vm:cpu_usage_max_5m > 0
+                        - record: acm_rs_vm:cpu_underestimation
+                          expr: |
+                            acm_rs_vm:cpu_usage_max_5m - acm_rs_vm:cpu_request > 0
+                        - record: acm_rs_vm:memory_usage_max_5m
+                          expr: |
+                            max_over_time(
+                              (sum by (name, namespace, cluster) (
+                                kubevirt_vmi_memory_available_bytes - kubevirt_vmi_memory_usable_bytes
+                              ))[5m:1m]
+                            )
+                        - record: acm_rs_vm:memory_request
+                          expr: |
+                            sum by (name, namespace, cluster) (
+                              kubevirt_vm_resource_requests{resource="memory"}
+                            )
+                        - record: acm_rs_vm:memory_overestimation
+                          expr: |
+                            acm_rs_vm:memory_request - acm_rs_vm:memory_usage_max_5m > 0
+                        - record: acm_rs_vm:memory_underestimation
+                          expr: |
+                            acm_rs_vm:memory_usage_max_5m - acm_rs_vm:memory_request > 0

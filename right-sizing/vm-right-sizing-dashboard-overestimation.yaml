@@ -1,0 +1,489 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acm-rs-vm-overestimation-dashboard
+  namespace: open-cluster-management-observability
+  labels:
+    grafana-custom-dashboard: "true"
+data:
+  acm-rs-vm-overestimation.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [
+        {
+          "asDropdown": false,
+          "icon": "arrow-left",
+          "includeVars": false,
+          "keepTime": true,
+          "tags": [],
+          "targetBlank": false,
+          "title": "Back to Main Dashboard",
+          "type": "link",
+          "url": "/d/acm-rs-vm-main"
+        }
+      ],
+      "panels": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "red", "value": 2 }
+                ]
+              },
+              "unit": "short",
+              "decimals": 3
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "id": 1,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "CPU Overestimation",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:cpu_overestimation{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              },
+              "unit": "short",
+              "decimals": 3
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "id": 2,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "CPU Utilization",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:cpu_usage_max_5m{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "purple", "value": null }
+                ]
+              },
+              "unit": "short",
+              "decimals": 3
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "id": 3,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "CPU Request",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:cpu_request{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              },
+              "unit": "percentunit",
+              "decimals": 1
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "id": 4,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "CPU Utilization %",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:cpu_usage_max_5m{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"} / acm_rs_vm:cpu_request{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 134217728 },
+                  { "color": "red", "value": 536870912 }
+                ]
+              },
+              "unit": "bytes",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+          "id": 5,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Memory Overestimation",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:memory_overestimation{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              },
+              "unit": "bytes",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+          "id": 6,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Memory Utilization",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:memory_usage_max_5m{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "purple", "value": null }
+                ]
+              },
+              "unit": "bytes",
+              "decimals": 0
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+          "id": 7,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Memory Request",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:memory_request{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              },
+              "unit": "percentunit",
+              "decimals": 1
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+          "id": 8,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "title": "Memory Utilization %",
+          "type": "stat",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:memory_usage_max_5m{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"} / acm_rs_vm:memory_request{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "CPU cores",
+                "drawStyle": "line",
+                "fillOpacity": 15,
+                "gradientMode": "none",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": { "group": "A", "mode": "none" }
+              },
+              "unit": "short",
+              "decimals": 3
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "CPU Request" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } },
+                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+          "id": 9,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "title": "CPU Utilization Over Time",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:cpu_usage_max_5m{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "CPU Usage (max 5m)",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:cpu_request{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "CPU Request",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Observatorium" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisLabel": "bytes",
+                "drawStyle": "line",
+                "fillOpacity": 15,
+                "gradientMode": "none",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": { "group": "A", "mode": "none" }
+              },
+              "unit": "bytes",
+              "decimals": 0
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Memory Request" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [10, 10], "fill": "dash" } },
+                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
+          "id": 10,
+          "options": {
+            "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "title": "Memory Utilization Over Time",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:memory_usage_max_5m{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "Memory Usage (max 5m)",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "Observatorium" },
+              "expr": "acm_rs_vm:memory_request{name=\"$vmname\", namespace=\"$namespace\", cluster=\"$cluster\"}",
+              "legendFormat": "Memory Request",
+              "refId": "B"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["acm", "right-sizing", "virtualization", "overestimation"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "datasource": { "type": "prometheus", "uid": "Observatorium" },
+            "definition": "label_values(acm_rs_vm:cpu_request, cluster)",
+            "name": "cluster",
+            "query": { "qryType": 1, "query": "label_values(acm_rs_vm:cpu_request, cluster)" },
+            "refresh": 2,
+            "type": "query",
+            "label": "Cluster"
+          },
+          {
+            "current": {},
+            "datasource": { "type": "prometheus", "uid": "Observatorium" },
+            "definition": "label_values(acm_rs_vm:cpu_request{cluster=\"$cluster\"}, namespace)",
+            "name": "namespace",
+            "query": { "qryType": 1, "query": "label_values(acm_rs_vm:cpu_request{cluster=\"$cluster\"}, namespace)" },
+            "refresh": 2,
+            "type": "query",
+            "label": "Namespace"
+          },
+          {
+            "current": {},
+            "datasource": { "type": "prometheus", "uid": "Observatorium" },
+            "definition": "label_values(acm_rs_vm:cpu_overestimation{cluster=\"$cluster\", namespace=\"$namespace\"}, name)",
+            "name": "vmname",
+            "query": { "qryType": 1, "query": "label_values(acm_rs_vm:cpu_overestimation{cluster=\"$cluster\", namespace=\"$namespace\"}, name)" },
+            "refresh": 2,
+            "type": "query",
+            "label": "VM Name"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "",
+      "title": "ACM Right Sizing VM Overestimation Detail",
+      "uid": "acm-rs-vm-overestimation",
+      "version": 1
+    }

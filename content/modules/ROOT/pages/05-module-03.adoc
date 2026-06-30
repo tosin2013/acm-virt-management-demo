@@ -5,43 +5,7 @@
 
 toc::[]
 
-== Part 1 -- Understanding Application Topology in ACM
-
-=== Know
-
-_Application Topology is the visual proof that everything works together. After deploying VM-based applications via GitOps and enforcing policies, the topology view shows the complete dependency graph -- which components run where, their real-time status, and how they relate to each other._
-
-**Business Challenge:**
-In a multicluster environment, understanding "where is my application running and is it healthy?" requires correlating information across multiple cluster consoles, ArgoCD dashboards, and CLI sessions. This is error-prone and slow.
-
-**Technical Solution:**
-RHACM's Application Topology view interprets ArgoCD `Application` and `ApplicationSet` objects to render an interactive graph that:
-
-* Shows all application components across Hub and managed clusters
-* Displays real-time status (healthy, degraded, missing)
-* Enables remote log retrieval directly from the topology UI
-* Works for both container-based and VM-based workloads
-
-**Business Value:**
-
-* Visual validation of GitOps deployments -- see at a glance if everything landed correctly
-* Remote diagnostics without kubeconfig access -- fetch logs through the UI
-* Cross-cluster dependency mapping -- understand how services connect across clusters
-
-=== Show
-
-* Navigate to the ACM console at {openshift_console_url}
-
-* Go to *Applications* in the left navigation
-
-* Observe the list of managed applications
-
-[TIP]
-====
-If no applications are deployed yet, proceed to Part 2 to deploy a sample VM application via GitOps before returning to the topology view.
-====
-
-== Part 2 -- Deploying a VM Application via GitOps
+== Part 1 -- Deploying a VM Application via GitOps
 
 === Know
 
@@ -60,8 +24,9 @@ oc create namespace vm-demo-app
 
 * Apply the sample ApplicationSet that deploys a Fedora VM to all virtualization-enabled clusters:
 +
-[source,yaml]
+[source,role="execute"]
 ----
+cat <<'EOF' | oc apply -f -
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -93,6 +58,7 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+EOF
 ----
 
 * Wait for ArgoCD to sync the application to the managed clusters:
@@ -102,17 +68,42 @@ spec:
 oc get applications -n openshift-gitops -l app.kubernetes.io/part-of=vm-fedora-web
 ----
 
-== Part 3 -- Inspecting the Topology Graph
+== Part 2 -- Inspecting the Topology Graph
 
 === Know
 
-_The topology view is the "proof screenshot" for the customer -- it visually confirms that the entire GitOps pipeline works end-to-end, from Git commit to running VM across multiple clusters._
+_Application Topology is the visual proof that everything works together. After deploying VM-based applications via GitOps and enforcing policies, the topology view shows the complete dependency graph -- which components run where, their real-time status, and how they relate to each other._
 
-A critical capability to highlight: *remote log retrieval*. Level-1 operators can inspect VM pod logs and diagnose issues (CrashLoopBackOff, boot failures, network misconfigurations) directly from the topology view -- without needing kubeconfig access to the managed cluster. This reinforces the zero-trust operational model from Module 4.
+**Business Challenge:**
+In a multicluster environment, understanding "where is my application running and is it healthy?" requires correlating information across multiple cluster consoles, ArgoCD dashboards, and CLI sessions. This is error-prone and slow.
+
+**Technical Solution:**
+RHACM's Application Topology view interprets ArgoCD `Application` and `ApplicationSet` objects to render an interactive graph that:
+
+* Shows all application components across Hub and managed clusters
+* Displays real-time status (healthy, degraded, missing)
+* Enables remote log retrieval directly from the topology UI
+* Works for both container-based and VM-based workloads
+
+**Business Value:**
+
+* Visual validation of GitOps deployments -- see at a glance if everything landed correctly
+* Remote diagnostics without kubeconfig access -- fetch logs through the UI
+* Cross-cluster dependency mapping -- understand how services connect across clusters
 
 === Show
 
-* In the ACM console, navigate to *Applications* → select `vm-fedora-web`
+* Navigate to the ACM console at {openshift_console_url}
+
+* Go to *Applications* in the left navigation
+
+* Observe the list of managed applications -- the `vm-fedora-web` ApplicationSet deployed in Part 1 should be visible
+
+image::acm-applications-list.png[ACM Applications list showing vm-fedora-web]
+
+* Select `vm-fedora-web` to open the topology graph
+
+image::acm-topology-graph.png[ACM Topology graph showing VM components across clusters]
 
 * The topology graph displays:
 ** The ApplicationSet on the Hub
@@ -125,16 +116,30 @@ A critical capability to highlight: *remote log retrieval*. Level-1 operators ca
 ** Current phase (Running, Stopped, Migrating)
 ** Events timeline
 
+* Filter the topology by clicking the search/filter icon and typing `vm-fedora-web` to isolate just this application's components
+
+* Toggle between *Graph view* and *List view* to show different perspectives on the same deployment
+
+== Part 3 -- Remote Diagnostics via Topology
+
+=== Know
+
+_The topology view is the "proof screenshot" for the customer -- it visually confirms that the entire GitOps pipeline works end-to-end, from Git commit to running VM across multiple clusters._
+
+A critical capability to highlight: *remote log retrieval*. Level-1 operators can inspect VM pod logs and diagnose issues (CrashLoopBackOff, boot failures, network misconfigurations) directly from the topology view -- without needing kubeconfig access to the managed cluster. This reinforces the zero-trust operational model from Module 4.
+
+=== Show
+
+* In the topology graph, locate a VirtualMachine node and click on its virt-launcher pod
+
 * Click *View Logs* on the VM's virt-launcher pod to retrieve remote logs:
+
+image::acm-topology-vm-logs.png[Remote log retrieval from VM topology view]
 
 [NOTE]
 ====
 Emphasize to the customer: "You just retrieved logs from a VM running on a remote cluster without having any kubeconfig or direct CLI access to that cluster. The ACM Hub proxied the request securely."
 ====
-
-* Filter the topology by clicking the search/filter icon and typing `vm-fedora-web` to isolate just this application's components
-
-* Toggle between *Graph view* and *List view* to show different perspectives on the same deployment
 
 == Key Takeaways
 

@@ -39,8 +39,12 @@ toc::[]
 | 6 min
 | Apply non-destructive role, attempt and fail to delete cluster
 
+| Module 7: VM Right-Sizing Recommendations
+| 12-15 min
+| Deploy right-sizing policies, explore dashboards, resize a VM based on recommendation
+
 | *Total*
-| *~55 min*
+| *~80-90 min*
 |
 |===
 
