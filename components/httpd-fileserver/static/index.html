@@ -26,8 +26,9 @@ table{width:100%;border-collapse:collapse;margin-top:1rem}
 th{text-align:left;padding:.8rem;border-bottom:2px solid #333;color:#00d4ff;font-size:.85rem;text-transform:uppercase}
 td{padding:.7rem .8rem;border-bottom:1px solid #2a2a3e;font-size:.9rem}
 tr:hover td{background:#16213e}
-.url-cell{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.copy-btn{background:none;border:1px solid #555;color:#aaa;padding:.2rem .5rem;border-radius:4px;cursor:pointer;font-size:.75rem;margin-left:.5rem}
+.url-cell{display:flex;align-items:center;gap:.5rem}
+.url-cell code{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.copy-btn{background:none;border:1px solid #555;color:#aaa;padding:.2rem .5rem;border-radius:4px;cursor:pointer;font-size:.75rem;white-space:nowrap;flex-shrink:0}
 .copy-btn:hover{border-color:#00d4ff;color:#00d4ff}
 .size{color:#888}
 .toast{position:fixed;bottom:2rem;right:2rem;padding:1rem 1.5rem;border-radius:8px;color:#fff;font-size:.9rem;opacity:0;transition:opacity .3s;z-index:999}
