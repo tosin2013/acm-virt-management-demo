@@ -37,6 +37,17 @@ podman-compose up
 
 Open http://localhost:8080
 
+## Deployment
+
+See [agnosticd/DEPLOYMENT.md](agnosticd/DEPLOYMENT.md) for full setup instructions.
+
+Quick start (requires AgnosticD v2 + AWS credentials):
+
+```bash
+cd ~/Development/agnosticd-v2-vars/acm-virt-management-demo
+./deploy.sh
+```
+
 ## Target Environment
 
 Domain: `.sandbox3008.opentlc.com`
