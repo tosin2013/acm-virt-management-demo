@@ -22,6 +22,48 @@ The ApplicationSet uses the `clusterDecisionResource` generator, which dynamical
 oc create namespace vm-demo-app
 ----
 
+* Configure the ACM-ArgoCD integration by creating a `ManagedClusterSetBinding` and `GitOpsCluster` resource. This enables ArgoCD's `clusterDecisionResource` generator to discover managed clusters via ACM Placement:
++
+[source,role="execute"]
+----
+cat <<'EOF' | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: global
+  namespace: openshift-gitops
+spec:
+  clusterSet: global
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: virt-enabled-clusters
+  namespace: openshift-gitops
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            virtualization-enabled: "true"
+---
+apiVersion: apps.open-cluster-management.io/v1beta1
+kind: GitOpsCluster
+metadata:
+  name: gitops-cluster
+  namespace: openshift-gitops
+spec:
+  argoServer:
+    cluster: local-cluster
+    argoNamespace: openshift-gitops
+  placementRef:
+    kind: Placement
+    apiGroup: cluster.open-cluster-management.io
+    name: virt-enabled-clusters
+    namespace: openshift-gitops
+EOF
+----
+
 * Apply the sample ApplicationSet that deploys a Fedora VM to all virtualization-enabled clusters:
 +
 [source,role="execute"]

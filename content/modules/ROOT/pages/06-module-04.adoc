@@ -130,18 +130,23 @@ oc auth can-i delete managedclusters --as=demo-deployer
 +
 Expected output: `no`
 
-* Attempt to delete a namespace as the demo-deployer:
+* Verify the deployer cannot destroy managed clusters:
 +
 [source,role="execute"]
 ----
-oc delete namespace openshift-monitoring --as=demo-deployer --dry-run=server
+oc auth can-i delete managedclustersets --as=demo-deployer
 ----
 +
-Expected output: `Error from server (Forbidden)`
+Expected output: `no`
+
+[NOTE]
+====
+The `subscription-admin` role grants namespace management permissions (needed for cross-namespace Git deployments), but does NOT grant cluster lifecycle destruction (`delete managedclusters`, `delete managedclustersets`). Module 6 demonstrates how to further restrict even these operational users from cluster destruction.
+====
 
 [IMPORTANT]
 ====
-**Key message for the customer:** "This user just deployed VM governance policies across your entire fleet -- and they cannot delete a single namespace or cluster. Git is the single source of truth, not human CLI access."
+**Key message for the customer:** "This user just deployed VM governance policies across your entire fleet via Git -- without cluster-admin. They can deploy workloads but cannot destroy managed clusters. Git is the single source of truth, not human CLI access."
 ====
 
 == Key Takeaways

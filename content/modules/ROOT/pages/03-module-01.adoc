@@ -54,6 +54,29 @@ spec:
 EOF
 ----
 
+* Create the VM workload namespaces on the managed cluster (the policies in later parts target these namespaces):
++
+[source,role="execute"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
++
+[source,role="execute"]
+----
+oc create namespace vm-production --dry-run=client -o yaml | oc apply -f -
+oc create namespace vm-staging --dry-run=client -o yaml | oc apply -f -
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
 * Review the Placement resource that targets virtualization-enabled clusters:
 +
 [source,role="execute"]

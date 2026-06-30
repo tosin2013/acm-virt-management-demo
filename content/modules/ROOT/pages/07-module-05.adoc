@@ -85,11 +85,27 @@ oc get clusterpermissions -n {student_cluster_name}
 oc get manifestwork -n {student_cluster_name} -l rbac.open-cluster-management.io/cluster-permission=vm-editor-permission
 ----
 
-* On the managed cluster, verify the Role and RoleBinding were created in the target namespace:
+* SSH to the managed cluster bastion to verify the Role and RoleBinding were created:
 +
 [source,role="execute"]
 ----
-oc get roles,rolebindings -n vm-production -l app.kubernetes.io/managed-by=cluster-permission
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the distributed RBAC resources:
++
+[source,role="execute"]
+----
+oc get roles,rolebindings -n vm-production
+----
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
 ----
 
 == Part 3 -- Demonstrating Scoped VM Access

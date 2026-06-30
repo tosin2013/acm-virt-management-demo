@@ -68,10 +68,10 @@ oc apply -f right-sizing/rs-vm-policyset.yaml
 +
 [source,role="execute"]
 ----
-oc get policy -n open-cluster-management-policies -l policy.open-cluster-management.io/policy-set=rs-vm-policyset
+oc get policy -n open-cluster-management-policies | grep rs-vm
 ----
 +
-All policies should show `Compliant` status within a few minutes.
+Both `rs-vm-recording-rules` and `rs-vm-metrics-allowlist` should show `Compliant` status within a few minutes.
 
 * Deploy the Grafana dashboards:
 +
@@ -103,7 +103,16 @@ Point out to the customer: "This is the VMware DRS replacement -- but instead of
 
 image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing memory overestimation for fedora-web]
 
-* Act on the recommendation -- resize the VM to match actual usage:
+* Act on the recommendation -- SSH to the managed cluster bastion and resize the VM to match actual usage:
++
+[source,role="execute"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Resize the VM memory to match actual usage:
 +
 [source,role="execute"]
 ----
@@ -118,6 +127,13 @@ oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.spec.domain.resources.reques
 ----
 +
 Expected output: `512Mi`
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
 
 * Wait for the right-sizing metrics to update. The recording rules run at 5-minute intervals, so allow a few minutes for the dashboards to reflect the change. Return to the right-sizing dashboard and observe the reduced overestimation.
 

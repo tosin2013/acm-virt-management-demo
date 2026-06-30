@@ -130,14 +130,14 @@ Expected output:
 Error from server (Forbidden): managedclusters.cluster.open-cluster-management.io "{student_cluster_name}" is forbidden: User "demo-operator" cannot delete resource "managedclusters" in API group "cluster.open-cluster-management.io" at the cluster scope
 ----
 
-* **Hive Test** -- Attempt to delete a ClusterDeployment:
+* **Hive Test** -- Attempt to delete a ClusterDeployment (if the managed cluster was provisioned via Hive):
 +
 [source,role="execute"]
 ----
 oc delete clusterdeployment {student_cluster_name} -n {student_cluster_name} --as=demo-operator --dry-run=server
 ----
 +
-Expected output: `Error from server (Forbidden)`
+Expected output: `Error from server (Forbidden)` if a ClusterDeployment exists, or `Error from server (NotFound)` if the cluster was imported rather than provisioned via Hive. Both outcomes confirm the operator cannot destroy provisioned clusters.
 
 * **ClusterPool Test** -- Attempt to delete a ClusterPool:
 +

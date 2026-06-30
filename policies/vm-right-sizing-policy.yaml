@@ -62,7 +62,7 @@ spec:
                           labels:
                             severity: info
                           annotations:
-                            summary: "VM {{ $labels.name }} in {{ $labels.namespace }} is using less than 10% of requested CPU for 24h"
+                            summary: 'VM {{`{{ $labels.name }}`}} in {{`{{ $labels.namespace }}`}} is using less than 10% of requested CPU for 24h'
                             description: "Consider reducing CPU requests to optimize resource allocation."
                         - alert: VMUnderProvisionedMemory
                           expr: kubevirt:vm_memory_usage_ratio > 0.9
@@ -70,7 +70,7 @@ spec:
                           labels:
                             severity: warning
                           annotations:
-                            summary: "VM {{ $labels.name }} in {{ $labels.namespace }} is using more than 90% of requested memory"
+                            summary: 'VM {{`{{ $labels.name }}`}} in {{`{{ $labels.namespace }}`}} is using more than 90% of requested memory'
                             description: "Consider increasing memory requests to prevent OOM conditions."
     - objectDefinition:
         apiVersion: policy.open-cluster-management.io/v1

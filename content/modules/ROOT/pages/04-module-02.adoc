@@ -94,7 +94,7 @@ This drill-down capability eliminates the need for direct `oc` access to managed
 +
 [source,role="execute"]
 ----
-oc exec -n open-cluster-management-observability observatorium-thanos-query-0 -c thanos-query -- \
+oc exec -n open-cluster-management-observability deploy/observability-thanos-query -c thanos-query -- \
   curl -s 'http://localhost:9090/api/v1/query?query=kubevirt:vm_cpu_usage_ratio' | python3 -m json.tool
 ----
 
@@ -168,7 +168,7 @@ oc apply -f observability/vm-custom-alerts.yaml
 +
 [source,role="execute"]
 ----
-oc exec -n open-cluster-management-observability observatorium-thanos-query-0 -c thanos-query -- \
+oc exec -n open-cluster-management-observability deploy/observability-thanos-query -c thanos-query -- \
   curl -s 'http://localhost:9090/api/v1/query?query=ALERTS' | python3 -m json.tool
 ----
 
