@@ -163,7 +163,7 @@ _Windows Server workloads represent a significant portion of enterprise VM estat
 
 The workflow uses four components:
 
-* *HTTP File Server* -- an in-cluster file server (deployed on the Hub) where you upload the Windows ISO via a web UI
+* *HTTP File Server* -- an in-cluster file server where you upload the Windows ISO via a web UI
 * *CDI DataVolumes* -- Kubernetes resources that import the ISO from the file server into a PVC for the VM to boot from
 * *VirtIO drivers* -- Red Hat provides a container disk with Windows VirtIO drivers, attached as a secondary CD-ROM during installation
 * *Autounattend / Sysprep* -- XML answer files that automate the Windows installation and generalize the image for cloning
@@ -177,22 +177,40 @@ The workflow uses four components:
 
 === Show
 
-* Open the HTTP File Server UI in your browser:
+All Windows VM resources are created on the *student cluster* where OpenShift Virtualization runs with bare-metal KVM support.
+
+* Open the HTTP File Server UI on the *student cluster* in your browser:
 +
 ----
-https://httpd-server-httpd-server.{openshift_cluster_ingress_domain}
+https://httpd-server-httpd-server.{student_1_ingress_domain}
 ----
 +
-Log in with your OpenShift credentials when prompted by the OAuth login page.
+Log in with your student cluster OpenShift credentials when prompted by the OAuth login page.
 
 * Upload the Windows Server 2019 ISO using the drag-and-drop interface. Name the file `win2k19.iso`.
 
 [TIP]
 ====
-The file server uses OpenShift OAuth for external access. Any user registered with the cluster's identity providers can log in. Internal cluster access (used by DataVolumes) does not require authentication.
+The file server runs on the student cluster alongside OpenShift Virtualization. It uses the student cluster's OAuth for external browser access. DataVolumes on the same cluster use the internal service URL, so no cross-cluster traffic is needed for large ISO files.
 ====
 
-* Create a DataVolume to import the Windows ISO from the file server into a PVC:
+* SSH to the student cluster to create the Windows VM resources:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Ensure the `vm-demo-app` namespace exists on the student cluster:
++
+[source,role="execute"]
+----
+oc create namespace vm-demo-app --dry-run=client -o yaml | oc apply -f -
+----
+
+* Create a DataVolume to import the Windows ISO from the file server into a PVC. Since the file server runs on the same cluster, use the internal service URL:
 +
 [source,role="execute"]
 ----
@@ -248,7 +266,7 @@ EOF
 oc get datavolume win2019-iso -n vm-demo-app -w
 ----
 +
-The DataVolume progresses through `ImportScheduled` → `ImportInProgress` → `Succeeded`. This may take several minutes depending on ISO size.
+The DataVolume progresses through `ImportScheduled` → `ImportInProgress` → `Succeeded`. This may take several minutes depending on ISO size. Press `Ctrl+C` once status shows `Succeeded`.
 
 * Create ConfigMaps from the `autounattend.xml` and `sysprep-unattend.xml` answer files. These automate the entire Windows installation -- no manual prompts:
 +
@@ -267,20 +285,6 @@ oc create configmap win2019-sysprep -n vm-demo-app \
   --from-file=sysprep-unattend.xml=/tmp/sysprep-unattend.xml \
   --dry-run=client -o yaml | oc apply -f -
 ----
-+
-[TIP]
-====
-Alternatively, clone the repo and create from local files:
-
-[source,bash]
-----
-git clone https://github.com/tosin2013/acm-virt-management-demo.git
-oc create configmap win2019-autounattend -n vm-demo-app \
-  --from-file=autounattend.xml=acm-virt-management-demo/examples/vm-win2019/autounattend.xml
-oc create configmap win2019-sysprep -n vm-demo-app \
-  --from-file=sysprep-unattend.xml=acm-virt-management-demo/examples/vm-win2019/sysprep-unattend.xml
-----
-====
 
 * Create the Windows installation VM with VirtIO drivers and autounattend attached:
 +
@@ -385,9 +389,25 @@ NOTE: A full automated Windows install from ISO takes 15-30 minutes. The command
 If the wait times out, the VM may still be running correctly -- the Guest Agent installation requires outbound internet access from the VM pod network to download the MSI package. You can verify the VM is running with `oc get vmi win2019-install -n vm-demo-app` and check the console via the OpenShift web UI. The Guest Agent is not required for the remaining modules.
 ====
 
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
 ==== Generalize with Sysprep (Optional -- for golden-image cloning)
 
 If you want to turn this installed VM into a reusable golden image, run sysprep to strip machine-specific identity (SID, hostname). This step is *optional* for the demo but required in production image-building workflows.
+
+* SSH to the student cluster:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
 
 * Stop the VM and swap the autounattend ConfigMap for the sysprep answer file:
 +
@@ -430,15 +450,22 @@ C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /unattend:A:
 +
 The VM will generalize itself and shut down. The resulting `win2019-disk` PVC is now a clean golden image that can be cloned for new VMs without SID conflicts.
 
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
 == Part 3 -- Verify VM Deployments
 
 === Know
 
-_With both Fedora and Windows VMs deployed, verify they are running correctly. The Fedora VM should be fully operational via GitOps, and the Windows VM should have completed its automated installation._
+_With both Fedora and Windows VMs deployed on the student cluster, verify they are running correctly. The Fedora VM was deployed via GitOps, and the Windows VM completed its automated ISO-based installation._
 
 === Show
 
-* Check the Fedora VM status on the managed cluster:
+* SSH to the student cluster to verify all VMs:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -447,6 +474,7 @@ _With both Fedora and Windows VMs deployed, verify they are running correctly. T
 +
 Password: `{student_1_bastion_ssh_password}`
 
+* Check all VMs and their status:
 +
 [source,role="execute"]
 ----
@@ -454,7 +482,7 @@ oc get virtualmachines -n vm-demo-app
 oc get virtualmachineinstances -n vm-demo-app
 ----
 
-* Verify the Fedora VM is running and accessible:
+* Verify the Fedora VM is running:
 +
 [source,role="execute"]
 ----
@@ -463,14 +491,7 @@ oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.status.phase}'
 +
 Expected output: `Running`
 
-* Return to the Hub terminal:
-+
-[source,role="execute"]
-----
-exit
-----
-
-* Check the Windows VM status on the Hub (it runs locally since the DataVolumes were created on the Hub):
+* Verify the Windows VM and DataVolumes:
 +
 [source,role="execute"]
 ----
@@ -478,19 +499,17 @@ oc get virtualmachine win2019-install -n vm-demo-app
 oc get datavolume -n vm-demo-app
 ----
 
-* Access the Windows VM desktop through the OpenShift console:
-** Navigate to {openshift_console_url}
+* Access the Windows VM desktop through the student cluster's OpenShift console:
+** Navigate to {student_1_console_url}
 ** Go to *Virtualization* → *VirtualMachines* → select `win2019-install` → *Console*
 ** You should see the Windows Server 2019 desktop (auto-logged in as Administrator)
 
-* Verify RDP is enabled and the QEMU Guest Agent is running (from the VM console):
+* Return to the Hub terminal:
 +
-[source]
+[source,role="execute"]
 ----
-powershell -Command "Get-Service QEMU-GA | Select-Object Status"
+exit
 ----
-+
-Expected output: `Running`
 
 [TIP]
 ====

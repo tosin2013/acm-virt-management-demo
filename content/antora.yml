@@ -25,6 +25,7 @@ asciidoc:
     student_1_bastion_ssh_user: "student"
     student_1_bastion_ssh_password: "PROVIDED_AT_RUNTIME"
     student_1_ssh_command: "ssh student@bastion.GUID-s1.sandbox.opentlc.com"
+    student_1_ingress_domain: "apps.student.GUID-s1.sandbox.opentlc.com"
     num_students: "1"
     # Managed cluster name as registered in RHACM
     student_cluster_name: "student-1"

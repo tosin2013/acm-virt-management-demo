@@ -1,0 +1,130 @@
+---
+# ===================================================================
+# ACM Virtual Machine Management Demo - Hub Cluster
+# ===================================================================
+# This config provisions the RHACM Hub cluster with:
+#   - Advanced Cluster Management operator
+#   - OpenShift Virtualization operator
+#   - OpenShift GitOps (ArgoCD)
+#   - OADP (backup operator)
+#   - Showroom lab guide
+# ===================================================================
+tag: main
+
+cloud_provider: aws
+cloud_provider_version: "{{ tag }}"
+config: openshift-cluster
+
+# ===================================================================
+# Additional Collections
+# ===================================================================
+requirements_content:
+  collections:
+    - name: https://github.com/agnosticd/core_workloads.git
+      type: git
+      version: "{{ tag }}"
+
+# ===================================================================
+# AWS Settings
+# ===================================================================
+aws_region: us-east-2
+
+cloud_tags:
+  - owner: takinosh@redhat.com
+  - Purpose: acm-virt-management-demo
+  - config: openshift-cluster
+  - guid: "{{ guid }}"
+
+# ===================================================================
+# SSH Keys
+# ===================================================================
+host_ssh_authorized_keys:
+  - key: https://github.com/tosin2013.keys
+
+# ===================================================================
+# Bastion Settings
+# ===================================================================
+bastion_setup_student_user: true
+bastion_student_user_name: student
+
+install_satellite_repositories: false
+install_rhn_repositories: false
+
+# ===================================================================
+# OpenShift Cluster Settings
+# ===================================================================
+cluster_name: hub
+
+host_ocp4_installer_root_url: https://mirror.openshift.com/pub/openshift-v4/clients
+host_ocp4_installer_version: "4.22"
+
+host_ocp4_installer_set_user_data_kubeadmin_password: true
+openshift_cluster_admin_service_account_enable: true
+
+# ===================================================================
+# Worker Node Sizing (standard instances -- VMs run on student cluster)
+# ===================================================================
+worker_instance_type: m5.2xlarge
+worker_instance_count: 3
+
+# ===================================================================
+# Workloads
+# ===================================================================
+workloads:
+  - agnosticd.core_workloads.ocp4_workload_cert_manager
+  - agnosticd.core_workloads.ocp4_workload_authentication_htpasswd
+  - agnosticd.core_workloads.ocp4_workload_openshift_virtualization
+  - agnosticd.core_workloads.ocp4_workload_rhacm
+  - ocp4_workload_rhacm_observability
+  - agnosticd.core_workloads.ocp4_workload_openshift_gitops
+  - ocp4_workload_oadp
+
+# Showroom is NOT listed in workloads above because deploy.sh defers it
+# until after student clusters are ready (so student bastion/API/console
+# variables can be injected into the Antora lab guide).
+# deploy.sh runs a second agd provision with workloads: [showroom] only.
+
+# ===================================================================
+# Workload Variables
+# ===================================================================
+
+# --- cert-manager ---
+ocp4_workload_cert_manager_channel: stable-v1
+ocp4_workload_cert_manager_aws_region: "{{ aws_region }}"
+ocp4_workload_cert_manager_aws_access_key_id: "{{ hostvars.localhost.route53user_access_key }}"
+ocp4_workload_cert_manager_aws_secret_access_key: "{{ hostvars.localhost.route53user_secret_access_key }}"
+ocp4_workload_cert_manager_use_catalog_snapshot: false
+ocp4_workload_cert_manager_install_ingress_certificates: true
+ocp4_workload_cert_manager_install_api_certificates: false
+
+# --- htpasswd authentication ---
+ocp4_workload_authentication_htpasswd_user_count: 0
+ocp4_workload_authentication_htpasswd_admin_user: admin
+
+# --- OpenShift Virtualization ---
+ocp4_workload_openshift_cnv_channel: stable
+
+# --- RHACM ---
+ocp4_workload_rhacm_channel: release-2.16
+
+# --- OpenShift GitOps ---
+ocp4_workload_openshift_gitops_channel: latest
+
+# --- OADP ---
+ocp4_workload_oadp_channel: stable
+
+# --- Showroom ---
+# Showroom is deployed AFTER student clusters so that student bastion/API/console
+# variables are available in the Antora lab guide content.
+# deploy.sh re-runs agd provision with workloads overridden to [showroom]
+# once all student clusters are up, injecting their data as extra vars.
+ocp4_workload_showroom_content_git_repo: "https://github.com/tosin2013/acm-virt-management-demo.git"
+ocp4_workload_showroom_content_git_repo_ref: main
+ocp4_workload_showroom_terminal_type: showroom
+ocp4_workload_showroom_terminal_image: "quay.io/rhpds/openshift-showroom-terminal-ocp:latest"
+
+# --- RHACM Observability ---
+# Deploys MCO with S3-backed Thanos; S3 bucket is auto-created.
+ocp4_workload_rhacm_observability_s3_region: "{{ aws_region }}"
+ocp4_workload_rhacm_observability_retention: 5d
+ocp4_workload_rhacm_observability_storage_size: 10Gi
