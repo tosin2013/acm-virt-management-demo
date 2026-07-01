@@ -64,7 +64,7 @@ openshift_cluster_admin_service_account_enable: true
 # ===================================================================
 # Worker Node Sizing (standard instances -- VMs run on student cluster)
 # ===================================================================
-worker_instance_type: m5.2xlarge
+worker_instance_type: m5.xlarge
 worker_instance_count: 3
 
 # ===================================================================
