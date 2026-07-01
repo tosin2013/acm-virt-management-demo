@@ -73,7 +73,6 @@ worker_instance_count: 3
 workloads:
   - agnosticd.core_workloads.ocp4_workload_cert_manager
   - agnosticd.core_workloads.ocp4_workload_authentication_htpasswd
-  - agnosticd.core_workloads.ocp4_workload_openshift_virtualization
   - agnosticd.core_workloads.ocp4_workload_rhacm
   - ocp4_workload_rhacm_observability
   - agnosticd.core_workloads.ocp4_workload_openshift_gitops
@@ -100,9 +99,7 @@ ocp4_workload_cert_manager_install_api_certificates: false
 # --- htpasswd authentication ---
 ocp4_workload_authentication_htpasswd_user_count: 0
 ocp4_workload_authentication_htpasswd_admin_user: admin
-
-# --- OpenShift Virtualization ---
-ocp4_workload_openshift_cnv_channel: stable
+ocp4_workload_authentication_htpasswd_remove_kubeadmin: false
 
 # --- RHACM ---
 ocp4_workload_rhacm_channel: release-2.16
