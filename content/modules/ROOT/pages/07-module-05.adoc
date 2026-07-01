@@ -48,6 +48,8 @@ The dashboards are powered by `acm_rs_vm:*` metric families -- Prometheus record
 
 === Show
 
+NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+
 * Review the recording rule policy that deploys the `acm_rs_vm:*` Prometheus recording rules to managed clusters:
 +
 [source,role="execute"]

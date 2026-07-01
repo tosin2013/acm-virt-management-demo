@@ -5,6 +5,19 @@
 
 toc::[]
 
+[IMPORTANT]
+====
+All commands in this module run from the **Hub cluster terminal** unless otherwise noted. Verify you are on the Hub bastion and logged into OpenShift before proceeding:
+====
+
+[source,role="execute"]
+----
+oc whoami
+oc get managedclusters
+----
+
+You should see your admin user and both `local-cluster` and `student-1` in the output. If not, see xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters].
+
 == Part 1 -- Deploy a Fedora VM via GitOps
 
 === Know

@@ -30,6 +30,8 @@ RHACM's Application Topology view interprets ArgoCD `Application` and `Applicati
 
 === Show
 
+NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+
 * Navigate to the ACM console at {openshift_console_url}
 
 * Go to *Applications* in the left navigation

@@ -25,6 +25,8 @@ RHACM uses `ConfigurationPolicy` resources to wrap kubevirt.io objects in a decl
 
 === Show
 
+NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+
 NOTE: The student cluster was already labeled `virtualization-enabled=true` in Module 1. If you skipped Module 1, run: `oc label managedcluster {student_cluster_name} virtualization-enabled=true --overwrite`
 
 * Create a ManagedClusterSetBinding so the Placement can select managed clusters:

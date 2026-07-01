@@ -60,6 +60,8 @@ This module deploys two layers of defense:
 
 === Show
 
+NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+
 * Review the custom ClusterRole manifest:
 +
 [source,role="execute"]
