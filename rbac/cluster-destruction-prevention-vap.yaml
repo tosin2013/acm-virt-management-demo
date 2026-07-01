@@ -1,0 +1,47 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: deny-cluster-destruction
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["cluster.open-cluster-management.io"]
+        apiVersions: ["*"]
+        operations: ["DELETE"]
+        resources: ["managedclusters", "managedclustersets"]
+      - apiGroups: ["hive.openshift.io"]
+        apiVersions: ["*"]
+        operations: ["DELETE"]
+        resources: ["clusterdeployments", "clusterclaims", "clusterpools"]
+  matchConditions:
+    - name: exclude-cluster-admins
+      expression: >-
+        !request.userInfo.groups.exists(g,
+          g == 'system:masters' ||
+          g == 'cluster-admins' ||
+          g == 'system:cluster-admins')
+        && request.userInfo.username != 'admin'
+        && request.userInfo.username != 'system:admin'
+        && !request.userInfo.username.startsWith('system:serviceaccount:open-cluster-management')
+        && !request.userInfo.username.startsWith('system:serviceaccount:multicluster-engine')
+        && !request.userInfo.username.startsWith('system:serviceaccount:hive')
+  validations:
+    - expression: "false"
+      messageExpression: >-
+        'User ' + request.userInfo.username +
+        ' is denied from deleting ' + request.resource.resource +
+        '. Cluster destruction is blocked by ValidatingAdmissionPolicy deny-cluster-destruction.'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: deny-cluster-destruction-binding
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+spec:
+  policyName: deny-cluster-destruction
+  validationActions:
+    - Deny

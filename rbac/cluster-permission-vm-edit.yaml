@@ -56,23 +56,3 @@ spec:
       kind: Group
       name: vm-operators
       apiGroup: rbac.authorization.k8s.io
-  roleBindings:
-    - namespace: vm-production
-      subject:
-        kind: Group
-        name: vm-operators
-        apiGroup: rbac.authorization.k8s.io
-      roleRef:
-        apiGroup: rbac.authorization.k8s.io
-        kind: ClusterRole
-        name: vm-editor-permission
-    - namespace: vm-staging
-      subject:
-        kind: Group
-        name: vm-operators
-        apiGroup: rbac.authorization.k8s.io
-      roleRef:
-        apiGroup: rbac.authorization.k8s.io
-        kind: ClusterRole
-        name: vm-editor-permission
-  validate: true

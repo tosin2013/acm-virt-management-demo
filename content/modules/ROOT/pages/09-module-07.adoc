@@ -22,17 +22,16 @@ Neither option is acceptable for organizations with dozens of clusters and hundr
 **Technical Solution:**
 The `ClusterPermission` API (`clusterpermissions.rbac.open-cluster-management.io`) allows the Hub to:
 
-1. Define a custom role with exact kubevirt.io permissions
-2. Automatically distribute Role and RoleBinding resources to specific namespaces on managed clusters
+1. Define a custom ClusterRole with exact kubevirt.io permissions
+2. Automatically distribute the ClusterRole and ClusterRoleBinding to managed clusters
 3. Maintain the lifecycle of distributed RBAC via ManifestWork synchronization
-4. Validate that referenced roles exist before deployment
 
 **Business Value:**
 
-* *Surgical precision* -- grant exactly `kubevirt.io:edit` on namespace `vm-production`, nothing else
+* *Surgical precision* -- grant exactly kubevirt.io operations, nothing else
 * *Lifecycle management* -- permissions are continuously synchronized, not "set and forget"
-* *Validation* -- the `validate: true` spec prevents broken authorization chains
 * *Centralized audit* -- all permission grants are visible on the Hub
+* *Group-based targeting* -- bind to a group, not individual users, for scalable team management
 
 === Show
 
@@ -45,9 +44,9 @@ cat rbac/cluster-permission-vm-edit.yaml
 
 * Note the key elements:
 ** `clusterRole.rules` defines exactly which kubevirt.io operations are permitted
-** `roleBindings` targets specific namespaces (`vm-production`, `vm-staging`)
-** `validate: true` ensures the role exists before binding
-** The subject is a Group (`vm-operators`) -- not individual users
+** `clusterRoleBinding` creates a ClusterRoleBinding on the managed cluster for the `vm-operators` group
+** The ClusterRole is auto-generated and distributed via ManifestWork synchronization
+** The subject is a Group (`vm-operators`) -- not individual users, so team membership changes propagate automatically
 
 == Part 2 -- Applying ClusterPermission
 
@@ -82,10 +81,10 @@ oc get clusterpermissions -n {student_cluster_name}
 +
 [source,role="execute",subs="attributes+"]
 ----
-oc get manifestwork -n {student_cluster_name} -l rbac.open-cluster-management.io/cluster-permission=vm-editor-permission
+oc get manifestwork -n {student_cluster_name} | grep vm-editor
 ----
 
-* SSH to the managed cluster bastion to verify the Role and RoleBinding were created:
+* SSH to the managed cluster bastion to verify the ClusterRole and ClusterRoleBinding were created:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -98,7 +97,8 @@ Password: `{student_1_bastion_ssh_password}`
 +
 [source,role="execute"]
 ----
-oc get roles,rolebindings -n vm-production
+oc get clusterrole vm-editor-permission
+oc get clusterrolebinding vm-editor-permission -o yaml | grep -A3 subjects
 ----
 
 * Return to the Hub terminal:
@@ -112,11 +112,20 @@ exit
 
 === Know
 
-_The proof is in the access. A user in the `vm-operators` group can now manage VMs in the allowed namespaces -- and is denied access to everything else._
+_The proof is in the access. A user in the `vm-operators` group can now manage VMs on the managed cluster -- and is denied access to everything else._
 
-This is the exact capability enterprises need: their VM operations team can start, stop, restart, and console into VMs without seeing the underlying node configuration, network topology, or storage infrastructure.
+This is the exact capability enterprises need: their VM operations team can start, stop, restart, and console into VMs without seeing the underlying node configuration, network topology, or storage infrastructure. These access checks must run on the managed cluster where the ClusterPermission distributed the RBAC.
 
 === Show
+
+* ClusterPermission distributes RBAC to the managed cluster, so the access checks must run there. SSH to the student cluster bastion:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
 
 * As a vm-operators group member, demonstrate permitted actions:
 +
@@ -161,15 +170,22 @@ oc auth can-i get virtualmachines.kubevirt.io -n kube-system --as-group=vm-opera
 +
 Expected output: `no`
 
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
 [NOTE]
 ====
-**Point out to the customer:** "This operator can start, stop, restart, and console into any VM in `vm-production` and `vm-staging`. They cannot see a single node, secret, or resource outside those namespaces. And this permission is centrally managed from the Hub -- if you revoke it here, it disappears from all managed clusters within seconds."
+**Point out to the customer:** "This operator can start, stop, restart, and console into any VM on this managed cluster. They cannot see a single node, secret, or cluster-level resource outside their granted permissions. And this permission is centrally managed from the Hub -- if you revoke the ClusterPermission, the RBAC disappears from all managed clusters within seconds."
 ====
 
 == Key Takeaways
 
 * ClusterPermission API replaces manual Role/RoleBinding management at scale
-* Permissions are namespace-scoped and continuously synchronized via ManifestWork
-* The `validate` spec prevents broken authorization chains
-* VM operators get exactly the access they need -- kubevirt.io operations in specific namespaces
+* Permissions are continuously synchronized via ManifestWork -- drift is automatically corrected
+* VM operators get exactly the access they need -- kubevirt.io operations, nothing else
 * Revoking access on the Hub propagates to all managed clusters automatically
+* Group-based subjects mean team membership changes propagate without manifest updates

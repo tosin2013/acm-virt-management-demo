@@ -15,7 +15,10 @@ _The most catastrophic risk in a hub-and-spoke architecture is the destruction o
 The default `open-cluster-management:cluster-manager-admin` role grants `create`, `read`, `update`, and `delete` on all cluster lifecycle resources. This is the equivalent of giving every building manager a demolition permit -- technically correct, but operationally catastrophic.
 
 **Technical Solution:**
-This module deploys a custom `rhacm-nondestructive-operator` ClusterRole that explicitly omits the `delete` verb for all cluster lifecycle API groups:
+This module deploys two layers of defense:
+
+1. **Non-destructive ClusterRole** -- a custom `rhacm-nondestructive-operator` ClusterRole that explicitly omits the `delete` verb for all cluster lifecycle API groups
+2. **ValidatingAdmissionPolicy** -- a Kubernetes-native admission policy that denies DELETE operations on cluster lifecycle resources for all non-admin users, regardless of their RBAC bindings
 
 [cols="1,1,1", options="header"]
 |===
@@ -42,9 +45,15 @@ This module deploys a custom `rhacm-nondestructive-operator` ClusterRole that ex
 | get, list, watch, update, patch
 |===
 
+[IMPORTANT]
+====
+**Why two layers?** Kubernetes RBAC is _additive_ -- permissions from all bound ClusterRoles are unioned together. A user with both the non-destructive role AND a ManagedClusterSet admin binding would still have `delete` via the admin binding. The ValidatingAdmissionPolicy acts as a second gate: even if RBAC grants `delete`, the admission policy denies the API call before it reaches the resource.
+====
+
 **Business Value:**
 
-* *Architectural impossibility* -- cluster destruction is not just "discouraged" or "audited" -- it is cryptographically denied by the Kubernetes API server
+* *Defense in depth* -- two independent mechanisms must both allow the operation
+* *Architectural impossibility* -- cluster destruction is denied at the admission control layer, not just RBAC
 * *Compliance alignment* -- satisfies DISA STIG, NIST, and HIPAA requirements for destructive action controls
 * *Operational safety* -- operators can still observe, update, and manage clusters -- only destruction is removed
 * *Zero-trust posture* -- even a fully compromised Hub account cannot destroy the fleet
@@ -58,16 +67,25 @@ This module deploys a custom `rhacm-nondestructive-operator` ClusterRole that ex
 cat rbac/rhacm-nondestructive-operator-clusterrole.yaml
 ----
 
-* Note the key design decisions:
-** `get`, `list`, `watch`, `update`, `patch` are permitted -- full operational capability
-** `delete` and `create` are omitted for cluster lifecycle resources -- no destruction, no unauthorized provisioning
+* Review the ValidatingAdmissionPolicy that provides the second layer of defense:
++
+[source,role="execute"]
+----
+cat rbac/cluster-destruction-prevention-vap.yaml
+----
++
+Note the key design decisions:
+** The ClusterRole omits `delete` for cluster lifecycle resources -- first layer
+** The ValidatingAdmissionPolicy denies DELETE operations at the admission control level -- second layer
+** `matchConditions` exempts `system:masters`, `cluster-admins`, the `admin` user, and RHACM system service accounts
+** All other users are denied, regardless of their RBAC bindings
 ** Policy and application resources retain `create` -- operators can still deploy governance and workloads
 
-== Part 2 -- Applying the Non-Destructive Role
+== Part 2 -- Applying the Non-Destructive Role and Admission Policy
 
 === Know
 
-_The custom ClusterRole replaces the default superset roles for day-to-day operations. By binding operators to `rhacm-nondestructive-operator` instead of `cluster-manager-admin`, the organization eliminates the single most dangerous permission in the entire RHACM stack._
+_The custom ClusterRole replaces the default superset roles for day-to-day operations. The ValidatingAdmissionPolicy provides defense in depth -- even if a user inherits `delete` from a ManagedClusterSet admin binding or any other source, the admission policy blocks the API call._
 
 === Show
 
@@ -78,6 +96,13 @@ _The custom ClusterRole replaces the default superset roles for day-to-day opera
 oc apply -f rbac/rhacm-nondestructive-operator-clusterrole.yaml
 ----
 
+* Apply the ValidatingAdmissionPolicy:
++
+[source,role="execute"]
+----
+oc apply -f rbac/cluster-destruction-prevention-vap.yaml
+----
+
 * Verify the ClusterRole was created:
 +
 [source,role="execute"]
@@ -85,14 +110,15 @@ oc apply -f rbac/rhacm-nondestructive-operator-clusterrole.yaml
 oc get clusterrole rhacm-nondestructive-operator -o yaml
 ----
 
-* Verify the binding:
+* Verify the ValidatingAdmissionPolicy is active:
 +
 [source,role="execute"]
 ----
-oc get clusterrolebinding rhacm-nondestructive-operator-binding -o yaml
+oc get validatingadmissionpolicy deny-cluster-destruction
+oc get validatingadmissionpolicybinding deny-cluster-destruction-binding
 ----
 
-* Confirm the demo-operator user has the expected permissions:
+* Confirm the demo-operator user has the expected non-destructive permissions:
 +
 [source,role="execute"]
 ----
@@ -113,7 +139,7 @@ Expected output: `yes`
 
 === Know
 
-_This is the most impactful moment of the entire demo. The operator attempts to destroy a managed cluster -- and the Kubernetes API server denies the request with a `Forbidden` error. This proves that the protection is not a UI guardrail or a policy warning -- it is an architectural constraint enforced at the API level._
+_This is the most impactful moment of the entire demo. The operator attempts to destroy a managed cluster -- and the Kubernetes API server denies the request. This proves that the protection is not a UI guardrail or a policy warning -- it is an architectural constraint enforced at the admission control level._
 
 === Show
 
@@ -126,9 +152,11 @@ oc delete managedcluster {student_cluster_name} --as=demo-operator --dry-run=ser
 +
 Expected output:
 +
-[subs="attributes+"]
 ----
-Error from server (Forbidden): managedclusters.cluster.open-cluster-management.io "{student_cluster_name}" is forbidden: User "demo-operator" cannot delete resource "managedclusters" in API group "cluster.open-cluster-management.io" at the cluster scope
+The managedclusters "student-1" is invalid:
+  : ValidatingAdmissionPolicy 'deny-cluster-destruction' ... denied the request:
+  User demo-operator is denied from deleting managedclusters.
+  Cluster destruction is blocked by ValidatingAdmissionPolicy deny-cluster-destruction.
 ----
 
 * **Hive Test** -- Attempt to delete a ClusterDeployment (if the managed cluster was provisioned via Hive):
@@ -138,7 +166,7 @@ Error from server (Forbidden): managedclusters.cluster.open-cluster-management.i
 oc delete clusterdeployment {student_cluster_name} -n {student_cluster_name} --as=demo-operator --dry-run=server
 ----
 +
-Expected output: `Error from server (Forbidden)` if a ClusterDeployment exists, or `Error from server (NotFound)` if the cluster was imported rather than provisioned via Hive. Both outcomes confirm the operator cannot destroy provisioned clusters.
+Expected output: Denied by the ValidatingAdmissionPolicy if a ClusterDeployment exists, or `Error from server (NotFound)` if the cluster was imported rather than provisioned via Hive. Both outcomes confirm the operator cannot destroy provisioned clusters.
 
 * **ClusterPool Test** -- Attempt to delete a ClusterPool:
 +
@@ -147,7 +175,7 @@ Expected output: `Error from server (Forbidden)` if a ClusterDeployment exists, 
 oc delete clusterpool demo-pool -n hive --as=demo-operator --dry-run=server
 ----
 +
-Expected output: `Error from server (Forbidden)`
+Expected output: Denied by the ValidatingAdmissionPolicy or `Error from server (Forbidden)`
 
 * **ManagedClusterSet Test** -- Attempt to delete a ManagedClusterSet:
 +
@@ -156,7 +184,7 @@ Expected output: `Error from server (Forbidden)`
 oc delete managedclusterset production-clusters --as=demo-operator --dry-run=server
 ----
 +
-Expected output: `Error from server (Forbidden)`
+Expected output: Denied by the ValidatingAdmissionPolicy or `Error from server (Forbidden)`
 
 * **Positive verification** -- Confirm the user CAN still perform non-destructive operations:
 +
@@ -174,13 +202,15 @@ Expected output: `managedcluster.cluster.open-cluster-management.io/{student_clu
 
 [IMPORTANT]
 ====
-**Deliver this message to the customer:** "Your operator can see every cluster, update labels, manage policies, deploy applications, and observe the entire fleet. The one thing they cannot do is destroy it. That is not a UI warning -- that is the Kubernetes API server cryptographically denying the request. Even if this account is fully compromised, your fleet is safe."
+**Deliver this message to the customer:** "Your operator can see every cluster, update labels, manage policies, deploy applications, and observe the entire fleet. The one thing they cannot do is destroy it. This is not a UI warning or an RBAC-only restriction -- it is a ValidatingAdmissionPolicy enforced at the Kubernetes admission control layer. Even if a user inherits `delete` from any ClusterRoleBinding, the admission policy blocks the API call. Even if this account is fully compromised, your fleet is safe."
 ====
 
 == Key Takeaways
 
-* The `rhacm-nondestructive-operator` ClusterRole provides full operational capability minus destruction
-* The `delete` verb is omitted for all cluster lifecycle API groups: `managedclusters`, `clusterdeployments`, `clusterclaims`, `clusterpools`, `managedclustersets`, `managedclustersetbindings`
-* Protection is enforced at the Kubernetes API level -- not a UI guardrail or policy warning
+* Defense in depth: the `rhacm-nondestructive-operator` ClusterRole removes `delete` from RBAC, and the ValidatingAdmissionPolicy blocks `delete` at admission control
+* Kubernetes RBAC is additive -- ClusterRoles cannot _remove_ permissions granted by other bindings. The ValidatingAdmissionPolicy closes this gap.
+* The `delete` verb is blocked for all cluster lifecycle API groups: `managedclusters`, `clusterdeployments`, `clusterclaims`, `clusterpools`, `managedclustersets`
+* Protection is enforced at the Kubernetes admission control level -- not a UI guardrail or policy warning
 * Operators retain `get`, `list`, `watch`, `update`, `patch` -- only destruction is removed
+* RHACM system service accounts are exempted so cluster lifecycle operations continue to function
 * This satisfies DISA STIG, NIST, HIPAA, and PCI-DSS requirements for destructive action controls

@@ -129,6 +129,18 @@ EOF
 ----
 oc get applications.argoproj.io -n openshift-gitops
 ----
++
+You should see an application named `vm-fedora-web-student-1` with Sync Status `Synced` and Health Status `Healthy`.
++
+[TIP]
+====
+If `No resources found` appears, the GitOpsCluster controller may need a few minutes to register newly imported managed clusters. Wait 2-3 minutes and re-run the command. You can check progress with:
+
+[source,bash]
+----
+oc get gitopscluster gitops-cluster -n openshift-gitops -o jsonpath='{.status}' | python3 -m json.tool
+----
+====
 
 == Part 2 -- Deploy a Windows Server 2019 VM
 
@@ -354,6 +366,11 @@ oc wait --for=condition=AgentConnected vmi/win2019-install -n vm-demo-app --time
 ----
 +
 NOTE: A full automated Windows install from ISO takes 15-30 minutes. The command above waits up to 30 minutes for the QEMU Guest Agent to connect after Windows Setup completes and runs the FirstLogonCommands.
++
+[TIP]
+====
+If the wait times out, the VM may still be running correctly -- the Guest Agent installation requires outbound internet access from the VM pod network to download the MSI package. You can verify the VM is running with `oc get vmi win2019-install -n vm-demo-app` and check the console via the OpenShift web UI. The Guest Agent is not required for the remaining modules.
+====
 
 ==== Generalize with Sysprep (Optional -- for golden-image cloning)
 

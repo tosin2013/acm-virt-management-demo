@@ -103,7 +103,14 @@ Point out to the customer: "This is the VMware DRS replacement -- but instead of
 
 image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing memory overestimation for fedora-web]
 
-* Act on the recommendation -- SSH to the managed cluster bastion and resize the VM to match actual usage:
+* Act on the recommendation. First, pause ArgoCD auto-sync on the Hub so the resize is not immediately reverted by GitOps self-heal:
++
+[source,role="execute"]
+----
+oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":null}}'
+----
+
+* SSH to the managed cluster bastion and resize the VM to match actual usage:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -134,6 +141,19 @@ Expected output: `512Mi`
 ----
 exit
 ----
+
+* Re-enable ArgoCD auto-sync when done:
++
+[source,role="execute"]
+----
+oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge \
+  -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true},"syncOptions":["CreateNamespace=true"]}}}'
+----
++
+[NOTE]
+====
+In a production workflow, the right-sizing change would be committed to the Git repository rather than applied directly. The ArgoCD sync-pause here demonstrates the feedback loop: observe → resize → verify. In production, update the VM manifest in Git and let ArgoCD sync the change.
+====
 
 * Wait for the right-sizing metrics to update. The recording rules run at 5-minute intervals, so allow a few minutes for the dashboards to reflect the change. Return to the right-sizing dashboard and observe the reduced overestimation.
 

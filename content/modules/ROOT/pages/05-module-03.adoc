@@ -153,18 +153,42 @@ If any of these components are deleted or modified, ACM automatically recreates 
 
 === Show
 
+* First, create the `openshift-adp` namespace on the managed cluster so the policy can install the OADP Operator:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
++
+[source,role="execute"]
+----
+oc create namespace openshift-adp --dry-run=client -o yaml | oc apply -f -
+----
++
+[source,role="execute"]
+----
+exit
+----
+
 * Apply the backup enforcement policy:
 +
 [source,role="execute"]
 ----
 oc apply -f policies/vm-backup-enforcement-policy.yaml
 ----
++
+[NOTE]
+====
+This policy enforces three components: the OADP Operator subscription, a daily backup schedule, and a DataProtectionApplication (DPA) configuration. The OADP Operator installation takes 2-3 minutes. The backup schedule policy will remain NonCompliant until the Velero CRDs are installed by the operator. The DPA policy uses `remediationAction: inform` because it requires S3 credentials (`cloud-credentials` Secret) that must be provisioned separately.
+====
 
 * In the ACM console, navigate to *Governance* → *Policies* and locate `vm-backup-enforcement`
 
 * Click the policy name to view compliance status per cluster
 
-* SSH to the student cluster bastion to verify the resources on the managed cluster:
+* Wait for the OADP Operator to install (2-3 minutes), then SSH to the student cluster bastion to verify:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -173,7 +197,14 @@ oc apply -f policies/vm-backup-enforcement-policy.yaml
 +
 Password: `{student_1_bastion_ssh_password}`
 
-* Verify the backup schedule exists:
+* Verify the OADP Operator is installed:
++
+[source,role="execute"]
+----
+oc get csv -n openshift-adp
+----
+
+* Verify the backup schedule exists (this may take an additional minute after operator installation):
 +
 [source,role="execute"]
 ----
