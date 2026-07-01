@@ -1,0 +1,17 @@
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: win2019-disk
+  namespace: vm-demo-app
+  annotations:
+    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+spec:
+  source:
+    blank: {}
+  pvc:
+    accessModes: [ReadWriteOnce]
+    storageClassName: gp3-csi
+    resources:
+      requests:
+        storage: 60Gi

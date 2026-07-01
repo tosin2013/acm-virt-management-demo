@@ -175,6 +175,48 @@ if (( NUM_STUDENTS > 0 )); then
 fi
 
 # -----------------------------------------------------------------
+# Step 2b: Post-import fixups on hub cluster
+#   - Enable ApplicationSet controller in ArgoCD CR
+#   - Install application-manager addon on each student cluster
+#     (required for GitOpsCluster to register clusters with ArgoCD)
+# -----------------------------------------------------------------
+echo "==> Applying post-import fixups on hub..."
+HUB_BASTION_HOST=$(grep 'bastion_public_hostname:' "$HUB_USER_DATA" 2>/dev/null | head -1 | awk '{print $2}')
+HUB_BASTION_PASS=$(grep 'bastion_ssh_password:' "$HUB_USER_DATA" 2>/dev/null | head -1 | awk '{print $2}')
+
+if [[ -n "$HUB_BASTION_HOST" && -n "$HUB_BASTION_PASS" ]]; then
+  sshpass -p "$HUB_BASTION_PASS" ssh -o StrictHostKeyChecking=no "student@${HUB_BASTION_HOST}" bash -s <<'FIXUP_EOF'
+# Enable ApplicationSet controller if not already present
+if ! oc get deploy openshift-gitops-applicationset-controller -n openshift-gitops &>/dev/null; then
+  echo "   Enabling ApplicationSet controller..."
+  oc patch argocd openshift-gitops -n openshift-gitops --type=merge \
+    -p '{"spec":{"applicationSet":{"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}}}'
+fi
+FIXUP_EOF
+
+  # Install application-manager addon on each student cluster
+  for i in $(seq 1 "$NUM_STUDENTS"); do
+    echo "   Installing application-manager addon on student-${i}..."
+    sshpass -p "$HUB_BASTION_PASS" ssh -o StrictHostKeyChecking=no "student@${HUB_BASTION_HOST}" bash -s <<ADDON_EOF
+oc apply -f - <<'EOF'
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: application-manager
+  namespace: student-${i}
+spec:
+  installNamespace: open-cluster-management-agent-addon
+EOF
+ADDON_EOF
+  done
+  echo "   Post-import fixups complete."
+else
+  echo "   WARNING: Could not determine hub bastion — skipping post-import fixups."
+  echo "   You will need to manually enable ApplicationSet and install application-manager addon."
+fi
+echo ""
+
+# -----------------------------------------------------------------
 # Step 3: Deploy Showroom on hub with student cluster data
 #   Generates a hub vars file that appends student cluster details
 #   as Showroom Antora attributes. Operators skip (idempotency).

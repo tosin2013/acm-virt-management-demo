@@ -1,0 +1,72 @@
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: win2019-install
+  namespace: vm-demo-app
+  labels:
+    app: windows-install
+    app.kubernetes.io/part-of: vm-win2019
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: win2019-install
+        app: windows-install
+    spec:
+      domain:
+        cpu:
+          cores: 4
+        devices:
+          disks:
+            - disk:
+                bus: virtio
+              name: installdisk
+              bootOrder: 2
+            - cdrom:
+                bus: sata
+              name: iso
+              bootOrder: 1
+            - cdrom:
+                bus: sata
+              name: virtiocontainerdisk
+            - disk:
+                bus: virtio
+              name: sysprep
+          interfaces:
+            - masquerade: {}
+              name: default
+          inputs:
+            - type: tablet
+              bus: usb
+              name: tablet
+        resources:
+          requests:
+            memory: 8Gi
+        machine:
+          type: q35
+        features:
+          acpi: {}
+          hyperv:
+            relaxed: {}
+            vapic: {}
+            spinlocks:
+              spinlocks: 8191
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: installdisk
+          persistentVolumeClaim:
+            claimName: win2019-disk
+        - name: iso
+          persistentVolumeClaim:
+            claimName: win2019-iso
+        - name: virtiocontainerdisk
+          containerDisk:
+            image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:7e06e1f52a434d4602657c920144504fbaed955d0998535bdf345716355ce83a
+        - name: sysprep
+          sysprep:
+            configMap:
+              name: win2019-autounattend

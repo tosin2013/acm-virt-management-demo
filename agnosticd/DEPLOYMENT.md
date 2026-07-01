@@ -202,22 +202,23 @@ tail -f ~/Development/agnosticd-v2-output/acmvirt-hub/acmvirt-hub.log
 |-----------|---------|
 | RHACM 2.16 | Multicluster governance (VM right-sizing, cross-cluster live migration) |
 | RHACM Observability | Centralized Grafana + Thanos with auto-provisioned S3 bucket |
-| OpenShift Virtualization | KVM-based VM hosting |
-| OpenShift GitOps | ArgoCD for declarative deployment |
+| OpenShift GitOps | ArgoCD for declarative VM deployment (ApplicationSet controller enabled) |
 | OADP | Velero-based VM backup |
 | cert-manager | TLS certificate automation |
 | Showroom | Interactive demo lab guide |
 
-Worker nodes use `m5.metal` instance type for bare-metal KVM support.
+Worker nodes use `m5.xlarge` instance type (standard compute — VMs run on student clusters).
 
 ### Student Clusters (`acm-virt-student-sno.yaml` / `acm-virt-student.yaml`)
 
 | Component | Purpose |
 |-----------|---------|
-| OpenShift Virtualization | KVM-based VM hosting (same as hub) |
+| OpenShift Virtualization | KVM-based VM hosting (Fedora and Windows VMs) |
+| HTTP File Server | In-cluster file server for Windows ISO hosting |
 | cert-manager | TLS certificate automation |
 | htpasswd auth | Student user accounts |
 | RHACM Import | Auto-registers spoke with hub RHACM |
+| application-manager addon | Provides credentials for ArgoCD cluster registration |
 
 **SNO (default):** Single `m5zn.metal` node (48 vCPU, 192 GiB) — runs control plane
 and workloads on one bare-metal instance with KVM support.
@@ -241,6 +242,42 @@ After deployment, find these in the vars directory:
 |------|----------|
 | `student-info.txt` | Console URLs, API endpoints, bastion SSH, passwords for all clusters |
 | `students.txt` | List of deployed GUIDs |
+
+## Post-Deployment: Upload Windows ISO
+
+After all clusters are provisioned and the HTTP file server is running on the student
+cluster, admins **must** upload the Windows Server 2019 ISO before students can complete
+Module 1 Part 3 (Windows VM deployment via GitOps).
+
+### Steps
+
+1. Open the file server UI in your browser:
+   ```
+   https://httpd-server-httpd-server.apps.student.<STUDENT-GUID>.sandbox.opentlc.com
+   ```
+
+2. Log in with the student cluster's OpenShift OAuth credentials (e.g., `admin` user)
+
+3. Upload the Windows Server 2019 ISO using the drag-and-drop interface. **Name the file `win2k19.iso`.**
+
+4. Verify the upload using the validation script (run from the student bastion):
+   ```bash
+   # From the student bastion (SSH in first)
+   /tmp/validate-iso.sh
+   ```
+
+   Or check manually:
+   ```bash
+   oc exec -n httpd-server deploy/httpd-fileserver -c httpd-fileserver -- stat -c '%s' /data/win2k19.iso
+   ```
+
+### Why This Is Manual
+
+The Windows ISO is ~5.3 GB and cannot be redistributed in Git or container images due
+to Microsoft licensing. It must be uploaded once per deployment. The DataVolume in
+`examples/vm-win2019/datavolume-iso.yaml` references the internal service URL
+(`http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso`), so the
+ISO must be present before the Windows VM ArgoCD Application can sync successfully.
 
 ### Showroom Variable Naming
 

@@ -163,11 +163,11 @@ oc auth can-i get secrets -n openshift-config --as-group=vm-operators --as=vm-us
 +
 Expected output: `no`
 
-* Show that the user has no access outside the permitted namespaces:
+* Show that the user has no access to non-VM resources in any namespace:
 +
 [source,role="execute"]
 ----
-oc auth can-i get virtualmachines.kubevirt.io -n kube-system --as-group=vm-operators --as=vm-user
+oc auth can-i delete namespaces --as-group=vm-operators --as=vm-user
 ----
 +
 Expected output: `no`

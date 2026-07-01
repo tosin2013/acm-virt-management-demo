@@ -106,6 +106,10 @@ ocp4_workload_rhacm_channel: release-2.16
 
 # --- OpenShift GitOps ---
 ocp4_workload_openshift_gitops_channel: latest
+# NOTE: The default ArgoCD CR does not enable the ApplicationSet controller.
+# deploy.sh patches the ArgoCD CR post-install (Step 2b) to enable it.
+# The application-manager addon is also installed on student clusters
+# so GitOpsCluster can register them with ArgoCD.
 
 # --- OADP ---
 ocp4_workload_oadp_channel: stable

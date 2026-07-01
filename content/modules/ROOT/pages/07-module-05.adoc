@@ -15,7 +15,11 @@ _In VMware environments, DRS (Distributed Resource Scheduler) automatically bala
 Organizations migrating from VMware consistently over-allocate VM resources "just in case." Without a data-driven feedback loop, teams request 4 GiB of memory for workloads that use 400 MiB, and 4 vCPUs for single-threaded services. This waste compounds across hundreds of VMs and dozens of clusters -- inflating infrastructure costs while starving other workloads of capacity.
 
 **Technical Solution:**
-RHACM 2.16 right-sizing provides three dashboard levels that progressively drill down into resource efficiency:
+RHACM 2.16 deploys right-sizing **automatically** when observability is enabled. No manual policy deployment is required. The system includes:
+
+* *Recording rules policies* (`rs-prom-rules-policy` and `rs-virt-prom-rules-policy`) deployed via the `open-cluster-management-global-set` namespace to all managed clusters
+* *Pre-built Grafana dashboards* in the "RightSizing Recommendation" and "ACM / OpenShift Virtualization" folders
+* *Metrics allowlists* that forward `acm_rs_vm:*` recording rule results from managed clusters to the Hub's Thanos
 
 [cols="1,1,2", options="header"]
 |===
@@ -29,90 +33,53 @@ RHACM 2.16 right-sizing provides three dashboard levels that progressively drill
 | Per-namespace
 | Aggregated resource waste grouped by namespace with configurable time windows (15d / 30d)
 
-| Per-VM Detail
+| Per-VM Detail (Overestimation)
 | Individual VM
-| Time-series CPU and memory usage vs. requests, with overestimation and underestimation flags
-|===
+| Time-series CPU and memory usage vs. requests, flagging over-provisioned VMs
 
-**Metrics Architecture:**
-The dashboards are powered by `acm_rs_vm:*` metric families -- Prometheus recording rules deployed to managed clusters via ACM Policies. These recording rules pre-compute usage-to-request ratios so the dashboards load instantly even at fleet scale.
+| Per-VM Detail (Underestimation)
+| Individual VM
+| Time-series usage exceeding requests, flagging under-provisioned VMs at risk of OOM
+|===
 
 **Business Value:**
 
+* *Zero deployment effort* -- right-sizing activates automatically with ACM Observability
 * *Data-driven capacity planning* -- replace guesswork with actual usage data across the fleet
 * *Cost optimization* -- identify and reclaim over-allocated resources systematically
 * *Performance protection* -- flag under-provisioned VMs before users experience OOM kills or CPU throttling
 * *VMware DRS replacement* -- GA Kubernetes-native alternative using open Prometheus standards
 
-== Part 2 -- Deploy Right-Sizing Policies and Dashboards
+== Part 2 -- Explore the Built-In Right-Sizing Infrastructure
 
 === Show
 
 NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
 
-* Review the recording rule policy that deploys the `acm_rs_vm:*` Prometheus recording rules to managed clusters:
+* Verify that the built-in right-sizing policies are already deployed and Compliant:
 +
 [source,role="execute"]
 ----
-cat right-sizing/rs-vm-rules-policy.yaml
+oc get policy -n open-cluster-management-global-set | grep rs-
 ----
++
+Expected output shows both `rs-prom-rules-policy` and `rs-virt-prom-rules-policy` as `Compliant`.
 
-* Apply the right-sizing policies and PolicySet:
+* Inspect the VM-specific recording rules policy to understand what metrics are computed:
 +
 [source,role="execute"]
 ----
-oc apply -f right-sizing/rs-vm-rules-policy.yaml
-oc apply -f right-sizing/rs-vm-allowlist-policy.yaml
-oc apply -f right-sizing/rs-vm-policyset.yaml
-----
-
-* Verify all right-sizing policies are Compliant:
-+
-[source,role="execute"]
-----
-oc get policy -n open-cluster-management-policies | grep rs-vm
+oc get policy rs-virt-prom-rules-policy -n open-cluster-management-global-set -o jsonpath='{.spec.policy-templates[0].objectDefinition.spec.object-templates[0].objectDefinition.spec.groups[0].rules[*].record}' | tr ' ' '\n'
 ----
 +
-Both `rs-vm-recording-rules` and `rs-vm-metrics-allowlist` should show `Compliant` status within a few minutes.
-
-* Deploy the Grafana dashboards:
+These are the `acm_rs_vm:*` recording rules that power the dashboards:
 +
-[source,role="execute"]
-----
-oc apply -f right-sizing/vm-right-sizing-dashboard-main.yaml
-oc apply -f right-sizing/vm-right-sizing-dashboard-overestimation.yaml
-oc apply -f right-sizing/vm-right-sizing-dashboard-underestimation.yaml
-----
+** `acm_rs_vm:namespace:cpu_request:5m` -- vCPU count per VM
+** `acm_rs_vm:namespace:cpu_usage:5m` -- actual CPU usage per VM
+** `acm_rs_vm:namespace:memory_request:5m` -- requested memory per VM
+** `acm_rs_vm:namespace:memory_usage:5m` -- actual memory usage per VM
 
-* Navigate to Grafana at {grafana_url} → search for *"ACM Right Sizing Openshift Virtualization Dashboard"*
-
-image::right-sizing-main-dashboard.png[ACM Right Sizing main dashboard showing VM fleet metrics]
-
-[TIP]
-====
-Point out to the customer: "This is the VMware DRS replacement -- but instead of a proprietary algorithm, you get transparent Prometheus metrics that integrate with your existing monitoring and alerting stack."
-====
-
-== Part 3 -- Identify and Act on a Right-Sizing Recommendation
-
-=== Show
-
-* In the right-sizing dashboard, filter by cluster and locate the *fedora-web* VM deployed in Module 1
-
-* Observe the overestimation flag: the VM requests 2Gi memory but the httpd workload uses far less -- memory overestimation is flagged by the recording rules
-
-* Click the VM name to drill into the detailed per-VM view showing time-series usage vs. requests
-
-image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing memory overestimation for fedora-web]
-
-* Act on the recommendation. First, pause ArgoCD auto-sync on the Hub so the resize is not immediately reverted by GitOps self-heal:
-+
-[source,role="execute"]
-----
-oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":null}}'
-----
-
-* SSH to the managed cluster bastion and resize the VM to match actual usage:
+* Verify the recording rules are producing data on the student cluster. SSH to the student cluster bastion:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -121,21 +88,35 @@ oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge -p
 +
 Password: `{student_1_bastion_ssh_password}`
 
-* Resize the VM memory to match actual usage:
+* Query the local Prometheus for VM right-sizing metrics:
 +
 [source,role="execute"]
 ----
-oc patch virtualmachine fedora-web -n vm-demo-app --type=merge -p '{"spec":{"template":{"spec":{"domain":{"resources":{"requests":{"memory":"512Mi"}}}}}}}'
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_request:5m'
 ----
++
+You should see entries for both the *fedora-web* and *win2019-install* VMs with their vCPU counts.
 
-* Verify the VM restarts with the new memory size:
+* Check the memory metrics for both VMs:
 +
 [source,role="execute"]
 ----
-oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.spec.domain.resources.requests.memory}'
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_request:5m'
 ----
 +
-Expected output: `512Mi`
+Notice the difference: *fedora-web* requests 4 GiB (a simple httpd server) while *win2019-install* requests 16 GiB (a Windows Server).
+
+* View the 1-day aggregated recommendations:
++
+[source,role="execute"]
+----
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_recommendation'
+----
++
+The recommendations include a 10% headroom margin (configurable via `rs-virt-config`). Compare these to the actual requests -- over-provisioned VMs will show a recommendation far below the current request.
 
 * Return to the Hub terminal:
 +
@@ -144,32 +125,229 @@ Expected output: `512Mi`
 exit
 ----
 
-* Re-enable ArgoCD auto-sync when done:
+[TIP]
+====
+Point out to the customer: "These recording rules were deployed automatically by RHACM -- no manual configuration required. Every managed cluster with observability enabled gets right-sizing data collection immediately."
+====
+
+== Part 3 -- Navigate the Right-Sizing Dashboards
+
+=== Show
+
+* Open Grafana at {grafana_url}
+
+* In the left navigation, go to *Dashboards* and open the *RightSizing Recommendation* folder
+
+* Open the *ACM Right-Sizing OpenShift Virtualization* dashboard (main overview)
+
+image::right-sizing-main-dashboard.png[ACM Right Sizing main dashboard showing VM fleet metrics]
+
+* Observe the fleet-level summary:
+** Total number of VMs across all managed clusters
+** Count of over-estimated VMs (requesting far more than they use)
+** Count of under-estimated VMs (at risk of resource exhaustion)
+
+* From the main dashboard, click through to the *VM Overestimation* dashboard to see per-VM details
+
+image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing overestimation]
+
+* Filter by the `vm-demo-app` namespace and observe both VMs:
+** *fedora-web* -- running a lightweight httpd service but allocated 1 vCPU and 4 GiB memory. The recommendation shows it needs only ~9 millicores of CPU and ~377 MiB of memory
+** *win2019-install* -- Windows Server 2019 with 4 vCPUs and 16 GiB. Usage will be higher, but still likely over-provisioned for a freshly installed system
+
+* Now open the *VM Underestimation* dashboard. If any VMs are using more resources than requested (memory usage exceeding the request), they appear here as candidates for upscaling.
+
+* Also explore the *ACM / OpenShift Virtualization* folder:
+** *Clusters Overview* -- executive-level fleet health
+** *Single Cluster View* -- drill into a specific managed cluster
+** *Single VM View* -- deep metrics for one VM (CPU, memory, network, storage)
+** *Virtual Machines Inventory* -- all VMs across the fleet with status
+** *Virtual Machines Utilization* -- resource consumption heatmaps
+
+[TIP]
+====
+Point out to the customer: "This is the VMware DRS replacement -- but instead of a proprietary algorithm, you get transparent Prometheus metrics across every dashboard level. And it's all built-in to RHACM 2.16 -- no additional operators or licenses required."
+====
+
+== Part 4 -- Act on a Right-Sizing Recommendation (Fedora VM)
+
+=== Know
+
+_The right-sizing dashboards provide the data; the next step is acting on it. This demonstrates the complete feedback loop: observe overestimation → resize the VM → verify improvement. In production, this resize would be committed to Git and synced via ArgoCD._
+
+=== Show
+
+* The *fedora-web* VM is a classic overestimation case: it runs a simple httpd service but was allocated 1 vCPU and 2 GiB memory. The right-sizing data shows it actually uses ~9 millicores of CPU and ~377 MiB of memory.
+
+* First, pause ArgoCD auto-sync on the Hub so the resize is not immediately reverted by GitOps self-heal:
++
+[source,role="execute"]
+----
+oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":null}}'
+----
+
+* SSH to the managed cluster bastion:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Resize the Fedora VM memory from 2Gi down to 512Mi based on the recommendation:
++
+[source,role="execute"]
+----
+oc patch virtualmachine fedora-web -n vm-demo-app --type=merge \
+  -p '{"spec":{"template":{"spec":{"domain":{"resources":{"requests":{"memory":"512Mi"}}}}}}}'
+----
+
+* The VM will restart with the new memory allocation. Verify:
++
+[source,role="execute"]
+----
+oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.spec.domain.resources.requests.memory}'
+echo
+----
++
+Expected output: `512Mi`
+
+* Confirm the httpd service is still healthy after the resize:
++
+[source,role="execute"]
+----
+curl -s -o /dev/null -w '%{http_code}' $(oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.status.interfaces[0].ipAddress}'):8080
+echo
+----
++
+Expected: `200` -- the web server is unaffected by the memory reduction.
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
+* Re-enable ArgoCD auto-sync:
 +
 [source,role="execute"]
 ----
 oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge \
   -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true},"syncOptions":["CreateNamespace=true"]}}}'
 ----
-+
+
 [NOTE]
 ====
-In a production workflow, the right-sizing change would be committed to the Git repository rather than applied directly. The ArgoCD sync-pause here demonstrates the feedback loop: observe → resize → verify. In production, update the VM manifest in Git and let ArgoCD sync the change.
+In a production workflow, the right-sizing change would be committed to the Git repository rather than applied directly. The ArgoCD sync-pause here demonstrates the feedback loop. In production, update the VM manifest in Git and let ArgoCD sync the change across the fleet.
 ====
 
-* Wait for the right-sizing metrics to update. The recording rules run at 5-minute intervals, so allow a few minutes for the dashboards to reflect the change. Return to the right-sizing dashboard and observe the reduced overestimation.
+== Part 5 -- Analyze the Windows VM Right-Sizing Data
 
-image::right-sizing-post-resize.png[Right-sizing dashboard showing reduced overestimation after resize]
+=== Know
+
+_Windows VMs are typically the most over-provisioned workloads in any fleet. Administrators allocate 8+ GiB "just for Windows" without measuring actual consumption. The right-sizing dashboards treat Windows VMs identically to Linux VMs -- providing the same transparent metrics._
+
+=== Show
+
+* SSH to the managed cluster bastion:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Check the current resource allocation for the Windows VM:
++
+[source,role="execute"]
+----
+echo "=== Windows VM Resource Requests ==="
+oc get vm win2019-install -n vm-demo-app -o jsonpath='CPU: {.spec.template.spec.domain.cpu.cores} cores{"\n"}Memory: {.spec.template.spec.domain.resources.requests.memory}{"\n"}'
+echo
+echo "=== Windows VM Actual Usage (from recording rules) ==="
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_usage:5m{name="win2019-install"}'
+echo
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_usage:5m{name="win2019-install"}'
+----
+
+* Compare the requested vs. actual usage:
++
+[source,role="execute"]
+----
+echo "=== Recommendation (with 10% headroom) ==="
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_recommendation{name="win2019-install"}'
+echo
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_recommendation{name="win2019-install"}'
+----
++
+For a freshly installed Windows Server 2019 that is idle, expect the recommendation to be significantly lower than the 4-core / 16 GiB allocation. In production, Windows VMs running actual workloads would show higher utilization -- the key is measuring before resizing.
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
 
 [IMPORTANT]
 ====
-**Deliver this message to the customer:** "You just completed the full right-sizing loop: observe overestimation in the dashboard, resize the VM based on data, and verify the improvement -- all without leaving the RHACM ecosystem. This is the same workflow at scale across hundreds of VMs and dozens of clusters."
+**Key insight for the customer:** Windows VMs are first-class citizens in the right-sizing framework. The same `acm_rs_vm:*` recording rules, dashboards, and recommendations apply regardless of guest OS. This eliminates the need for in-guest monitoring agents for capacity planning purposes.
 ====
+
+== Part 6 -- Customize Right-Sizing Thresholds
+
+=== Know
+
+_The built-in right-sizing uses a default 110% recommendation margin (i.e., recommend 10% above peak usage). Organizations with stricter SLAs may want a higher margin, while cost-aggressive teams may accept a lower one. The `rs-virt-config` ConfigMap controls this behavior._
+
+=== Show
+
+* View the current right-sizing configuration on the Hub:
++
+[source,role="execute"]
+----
+oc get cm rs-virt-config -n open-cluster-management-observability -o jsonpath='{.data.prometheusRuleConfig}' | cat
+----
++
+Key settings:
++
+** `recommendationPercentage: 110` -- adds 10% headroom above observed peak usage
+** `exclusionCriteria: ["openshift.*"]` -- excludes OpenShift system namespaces from right-sizing
+
+* To change the recommendation margin (for example, to 125% for production VMs with stricter SLAs):
++
+[source,role="execute"]
+----
+oc patch cm rs-virt-config -n open-cluster-management-observability --type=merge \
+  -p '{"data":{"prometheusRuleConfig":"namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 125\n"}}'
+----
++
+[NOTE]
+====
+Changing the `recommendationPercentage` triggers a regeneration of the recording rules policy. Allow 5-10 minutes for the updated rules to propagate to all managed clusters and produce new recommendation values.
+====
+
+* Revert to the default 110% margin:
++
+[source,role="execute"]
+----
+oc patch cm rs-virt-config -n open-cluster-management-observability --type=merge \
+  -p '{"data":{"prometheusRuleConfig":"namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 110\n"}}'
+----
 
 == Key Takeaways
 
-* RHACM 2.16 right-sizing is the GA Kubernetes-native replacement for VMware DRS
-* Three-level drill-down: fleet → namespace → per-VM with configurable aggregation windows (15d / 30d)
-* The complete right-sizing loop: observe overestimation → resize → verify improvement
-* All deployed via ACM Policies -- the same governance-as-code pattern from Module 3
-* Right-sizing integrates with the custom alerts from Module 4 for proactive notification
+* RHACM 2.16 right-sizing is **built-in** -- it activates automatically with ACM Observability, no manual policy deployment required
+* The `acm_rs_vm:*` recording rules and Grafana dashboards are deployed out of the box to all managed clusters
+* Three-level drill-down: fleet → namespace → per-VM with overestimation and underestimation views
+* Both Linux (Fedora) and Windows (Server 2019) VMs are analyzed identically -- no guest agent required
+* The complete right-sizing loop: observe overestimation → resize → verify the workload is healthy → commit to Git
+* Recommendation thresholds are configurable via `rs-virt-config` to match organizational risk tolerance
+* This is the Kubernetes-native replacement for VMware DRS -- transparent, open-standards-based, and fleet-scale

@@ -16,46 +16,74 @@ oc whoami
 oc get managedclusters
 ----
 
-You should see your admin user and both `local-cluster` and `student-1` in the output. If not, see xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters].
+You should see your admin user and both `local-cluster` and `{student_cluster_name}` in the output. If not, see xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters].
 
-== Part 1 -- Deploy a Fedora VM via GitOps
+== Part 1 -- Set Up ACM-ArgoCD Integration
 
 === Know
 
-_Before governing, monitoring, or securing virtual machines, you need to deploy them. This module gets VMs running on your managed clusters using two deployment methods: GitOps-driven Fedora VMs and ISO-based Windows Server installation._
+_Before deploying VMs via GitOps, you need to integrate RHACM's cluster inventory with OpenShift GitOps (ArgoCD). This enables ArgoCD to discover managed clusters through ACM Placement resources and deploy workloads to them automatically._
 
-The Fedora deployment uses an ArgoCD ApplicationSet with the `clusterDecisionResource` generator, which dynamically resolves which managed clusters to target based on RHACM Placement resources. Adding or removing clusters from the fleet automatically updates the application deployment -- no manual ArgoCD configuration required.
+The integration follows four steps:
+
+* *ManagedClusterSet* -- groups clusters that should be visible to ArgoCD
+* *ManagedClusterSetBinding* -- grants the `openshift-gitops` namespace access to the cluster set
+* *Placement* -- selects clusters from the set using label-based predicates
+* *GitOpsCluster* -- registers the selected clusters as ArgoCD deployment targets
+* *application-manager addon* -- provides the credentials ArgoCD needs to reach managed clusters
 
 **Business Value:**
 
-* *Fleet-scale deployment* -- a single ApplicationSet deploys VMs to every matching cluster
-* *Dynamic targeting* -- cluster label changes automatically add or remove deployment targets
-* *GitOps audit trail* -- the VM definition lives in Git, every change is a commit
+* *Single pane of glass* -- ArgoCD sees all managed clusters without manual secret management
+* *Dynamic fleet membership* -- label a new cluster and it automatically becomes an ArgoCD target
+* *Separation of concerns* -- cluster admins manage labels, GitOps teams manage applications
 
 === Show
 
-* First, label the student cluster so RHACM Placement resources can target it for virtualization workloads:
+* Create a dedicated ManagedClusterSet for virtualization workloads:
++
+[source,role="execute"]
+----
+cat <<'EOF' | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSet
+metadata:
+  name: virt-clusters
+EOF
+----
+
+* Label the student cluster into the set and mark it for virtualization workloads:
 +
 [source,role="execute",subs="attributes+"]
 ----
-oc label managedcluster {student_cluster_name} virtualization-enabled=true --overwrite
+oc label managedcluster {student_cluster_name} \
+  cluster.open-cluster-management.io/clusterset=virt-clusters \
+  virtualization-enabled=true --overwrite
 ----
 
-* Verify the label was applied:
+* Verify the cluster is in the set:
 +
 [source,role="execute"]
 ----
-oc get managedclusters -l virtualization-enabled=true
+oc get managedclusters -l cluster.open-cluster-management.io/clusterset=virt-clusters
 ----
 
-* Create a namespace for the VM workload on the Hub:
+* Install the `application-manager` addon on the student cluster. This provides the credentials ArgoCD needs to deploy workloads to managed clusters:
 +
-[source,role="execute"]
+[source,role="execute",subs="attributes+"]
 ----
-oc create namespace vm-demo-app --dry-run=client -o yaml | oc apply -f -
+cat <<'EOF' | oc apply -f -
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: application-manager
+  namespace: {student_cluster_name}
+spec:
+  installNamespace: open-cluster-management-agent-addon
+EOF
 ----
 
-* Configure the ACM-ArgoCD integration by creating a `ManagedClusterSetBinding`, `Placement`, and `GitOpsCluster` resource. This enables ArgoCD's `clusterDecisionResource` generator to discover managed clusters via ACM Placement:
+* Create the ManagedClusterSetBinding, Placement, and GitOpsCluster resources to wire RHACM into ArgoCD:
 +
 [source,role="execute"]
 ----
@@ -63,10 +91,10 @@ cat <<'EOF' | oc apply -f -
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
-  name: global
+  name: virt-clusters
   namespace: openshift-gitops
 spec:
-  clusterSet: global
+  clusterSet: virt-clusters
 ---
 apiVersion: cluster.open-cluster-management.io/v1beta1
 kind: Placement
@@ -74,6 +102,8 @@ metadata:
   name: virt-enabled-clusters
   namespace: openshift-gitops
 spec:
+  clusterSets:
+    - virt-clusters
   predicates:
     - requiredClusterSelector:
         labelSelector:
@@ -91,11 +121,46 @@ spec:
     argoNamespace: openshift-gitops
   placementRef:
     kind: Placement
-    apiGroup: cluster.open-cluster-management.io
+    apiVersion: cluster.open-cluster-management.io/v1beta1
     name: virt-enabled-clusters
-    namespace: openshift-gitops
 EOF
 ----
+
+* Wait for the GitOpsCluster to register the managed cluster with ArgoCD (this may take 30-60 seconds):
++
+[source,role="execute"]
+----
+oc get gitopscluster gitops-cluster -n openshift-gitops -o jsonpath='{.status.message}'
+echo
+----
++
+Expected output: `Added managed clusters [student-1] to gitops namespace openshift-gitops`
++
+[TIP]
+====
+If it still shows `[]`, wait 30 seconds and re-run. The `application-manager` addon needs time to create the cluster credentials secret. You can check progress with:
+
+[source,bash]
+----
+oc get secrets -n openshift-gitops -l argocd.argoproj.io/secret-type=cluster --no-headers
+----
+
+You should see a secret named `{student_cluster_name}-application-manager-cluster-secret`.
+====
+
+== Part 2 -- Deploy a Fedora VM via GitOps
+
+=== Know
+
+_With ArgoCD integrated, you can now deploy VMs using an ApplicationSet. The Fedora deployment uses the `clusterDecisionResource` generator, which dynamically resolves which managed clusters to target based on RHACM Placement decisions. Adding or removing clusters from the fleet automatically updates the application deployment -- no manual ArgoCD configuration required._
+
+**Business Value:**
+
+* *Fleet-scale deployment* -- a single ApplicationSet deploys VMs to every matching cluster
+* *Dynamic targeting* -- cluster label changes automatically add or remove deployment targets
+* *GitOps audit trail* -- the VM definition lives in Git, every change is a commit
+
+=== Show
 
 * Apply the ApplicationSet that deploys a Fedora VM to all virtualization-enabled clusters:
 +
@@ -136,65 +201,114 @@ spec:
 EOF
 ----
 
-* Wait for ArgoCD to sync the application to the managed clusters:
+* Wait for ArgoCD to sync the application:
 +
 [source,role="execute"]
 ----
 oc get applications.argoproj.io -n openshift-gitops
 ----
 +
-You should see an application named `vm-fedora-web-student-1` with Sync Status `Synced` and Health Status `Healthy`.
+You should see an application named `vm-fedora-web-{student_cluster_name}` with Sync Status `Synced` and Health Status `Healthy`.
 +
 [TIP]
 ====
-If `No resources found` appears, the GitOpsCluster controller may need a few minutes to register newly imported managed clusters. Wait 2-3 minutes and re-run the command. You can check progress with:
-
-[source,bash]
-----
-oc get gitopscluster gitops-cluster -n openshift-gitops -o jsonpath='{.status}' | python3 -m json.tool
-----
+If `No resources found` appears, wait 1-2 minutes for the `clusterDecisionResource` generator to pick up the PlacementDecision. Re-run the command until the application appears.
 ====
 
-== Part 2 -- Deploy a Windows Server 2019 VM
+== Part 3 -- Deploy a Windows Server 2019 VM via GitOps
 
 === Know
 
-_Windows Server workloads represent a significant portion of enterprise VM estates. OpenShift Virtualization supports Windows VMs natively, and this part demonstrates the ISO-based installation workflow -- the same approach administrators use with traditional hypervisors, but integrated into the Kubernetes ecosystem._
+_Windows Server workloads represent a significant portion of enterprise VM estates. OpenShift Virtualization supports Windows VMs natively. This part demonstrates deploying a Windows VM entirely through GitOps -- the VM definition, DataVolumes, and answer files all live in Git and are synced by ArgoCD._
 
-The workflow uses four components:
+The workflow uses:
 
-* *HTTP File Server* -- an in-cluster file server where you upload the Windows ISO via a web UI
-* *CDI DataVolumes* -- Kubernetes resources that import the ISO from the file server into a PVC for the VM to boot from
-* *VirtIO drivers* -- Red Hat provides a container disk with Windows VirtIO drivers, attached as a secondary CD-ROM during installation
-* *Autounattend / Sysprep* -- XML answer files that automate the Windows installation and generalize the image for cloning
+* *CDI DataVolumes* -- import the Windows ISO from the in-cluster file server and provision a blank install disk
+* *VirtIO drivers* -- Red Hat provides a container disk with Windows VirtIO drivers, attached as a secondary CD-ROM
+* *Autounattend* -- an XML answer file that automates the entire Windows installation with no interactive prompts
+* *ArgoCD Application* -- deploys all resources to the student cluster in a single sync
+
+[NOTE]
+====
+*Admin pre-requisite:* The Windows Server 2019 ISO must be uploaded to the HTTP File Server before this step. If you haven't done this yet, open the file server UI at `https://httpd-server-httpd-server.{student_1_ingress_domain}`, log in with OpenShift OAuth, and upload the ISO as `win2k19.iso`.
+
+You can verify the ISO is available:
+
+[source,bash]
+----
+components/httpd-fileserver/validate-iso.sh
+----
+====
 
 **Business Value:**
 
-* *Fully automated install* -- the `autounattend.xml` answer file eliminates all interactive prompts, installs VirtIO drivers, enables RDP, and installs the QEMU Guest Agent automatically
-* *Golden-image ready* -- a built-in sysprep step generalizes the finished VM so the disk can be cloned as a reusable template
+* *Fully automated install* -- `autounattend.xml` eliminates all interactive prompts, installs VirtIO drivers, enables RDP, and installs the QEMU Guest Agent
+* *Golden-image ready* -- a built-in sysprep step generalizes the finished VM for cloning
+* *GitOps-managed* -- the entire VM stack (disk provisioning, answer files, VM definition) is version-controlled and auditable
 * *In-cluster hosting* -- ISOs are served from within the cluster, no external file shares needed
-* *Automated pipeline* -- Tekton pipelines can automate the entire image build process
 
 === Show
 
-All Windows VM resources are created on the *student cluster* where OpenShift Virtualization runs with bare-metal KVM support.
-
-* Open the HTTP File Server UI on the *student cluster* in your browser:
+* Apply an ArgoCD Application that deploys the Windows VM stack (DataVolumes, ConfigMaps, and VirtualMachine) to the student cluster:
 +
+[source,role="execute",subs="attributes+"]
 ----
-https://httpd-server-httpd-server.{student_1_ingress_domain}
+cat <<'EOF' | oc apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vm-win2019-{student_cluster_name}
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/tosin2013/acm-virt-management-demo.git'
+    targetRevision: main
+    path: examples/vm-win2019
+  destination:
+    server: 'https://cluster-proxy-addon-user.multicluster-engine.svc.cluster.local:9092/{student_cluster_name}'
+    namespace: vm-demo-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+----
+
+* Watch ArgoCD sync the Windows VM resources:
++
+[source,role="execute"]
+----
+oc get applications.argoproj.io -n openshift-gitops
 ----
 +
-Log in with your student cluster OpenShift credentials when prompted by the OAuth login page.
+You should see both `vm-fedora-web-{student_cluster_name}` and `vm-win2019-{student_cluster_name}` applications. The Windows app will show `Synced` once all resources are created on the student cluster.
 
-* Upload the Windows Server 2019 ISO using the drag-and-drop interface. Name the file `win2k19.iso`.
-
-[TIP]
+[NOTE]
 ====
-The file server runs on the student cluster alongside OpenShift Virtualization. It uses the student cluster's OAuth for external browser access. DataVolumes on the same cluster use the internal service URL, so no cross-cluster traffic is needed for large ISO files.
+The `autounattend.xml` in the ConfigMap automates the full Windows installation:
+
+* VirtIO storage and network drivers are loaded automatically
+* Windows Server 2019 Standard (Desktop Experience) is selected
+* Disk partitioning, hostname (`win2019-demo`), and timezone (UTC) are configured
+* Administrator password is set to `R3dH4tD3mo!`
+* RDP and WinRM are enabled
+* QEMU Guest Agent is installed at first login
+
+The full installation takes 15-30 minutes from ISO boot to desktop.
 ====
 
-* SSH to the student cluster to create the Windows VM resources:
+== Part 4 -- Verify VM Deployments
+
+=== Know
+
+_With both Fedora and Windows VMs deployed to the student cluster via GitOps, verify they are running correctly. The Fedora VM was deployed via ApplicationSet and the Windows VM via a direct ArgoCD Application -- both managed entirely through Git._
+
+=== Show
+
+* SSH to the student cluster to verify all VMs:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -203,191 +317,38 @@ The file server runs on the student cluster alongside OpenShift Virtualization. 
 +
 Password: `{student_1_bastion_ssh_password}`
 
-* Ensure the `vm-demo-app` namespace exists on the student cluster:
+* Check all VMs and their status:
 +
 [source,role="execute"]
 ----
-oc create namespace vm-demo-app --dry-run=client -o yaml | oc apply -f -
+oc get virtualmachines -n vm-demo-app
+oc get virtualmachineinstances -n vm-demo-app
 ----
 
-* Create a DataVolume to import the Windows ISO from the file server into a PVC. Since the file server runs on the same cluster, use the internal service URL:
+* Verify the Fedora VM is running:
 +
 [source,role="execute"]
 ----
-cat <<'EOF' | oc apply -f -
-apiVersion: cdi.kubevirt.io/v1beta1
-kind: DataVolume
-metadata:
-  name: win2019-iso
-  namespace: vm-demo-app
-  annotations:
-    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
-spec:
-  source:
-    http:
-      url: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso"
-  pvc:
-    accessModes: [ReadWriteOnce]
-    storageClassName: gp3-csi
-    resources:
-      requests:
-        storage: 7Gi
-EOF
+oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.status.phase}'
+echo
 ----
++
+Expected output: `Running`
 
-* Create a blank disk DataVolume for the Windows installation target:
+* Check the Windows VM DataVolumes and VM status:
 +
 [source,role="execute"]
 ----
-cat <<'EOF' | oc apply -f -
-apiVersion: cdi.kubevirt.io/v1beta1
-kind: DataVolume
-metadata:
-  name: win2019-disk
-  namespace: vm-demo-app
-  annotations:
-    cdi.kubevirt.io/storage.bind.immediate.requested: "true"
-spec:
-  source:
-    blank: {}
-  pvc:
-    accessModes: [ReadWriteOnce]
-    storageClassName: gp3-csi
-    resources:
-      requests:
-        storage: 60Gi
-EOF
+oc get datavolume -n vm-demo-app
+oc get virtualmachine win2019-install -n vm-demo-app
 ----
++
+The `win2019-iso` DataVolume should show `Succeeded` (ISO imported). The `win2019-disk` DataVolume shows `Succeeded` (blank disk provisioned). The VM should be in `Running` state (Windows is installing from the ISO).
 
-* Wait for the ISO import to complete:
-+
-[source,role="execute"]
-----
-oc get datavolume win2019-iso -n vm-demo-app -w
-----
-+
-The DataVolume progresses through `ImportScheduled` → `ImportInProgress` → `Succeeded`. This may take several minutes depending on ISO size. Press `Ctrl+C` once status shows `Succeeded`.
-
-* Create ConfigMaps from the `autounattend.xml` and `sysprep-unattend.xml` answer files. These automate the entire Windows installation -- no manual prompts:
-+
-[source,role="execute"]
-----
-curl -sL https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/autounattend.xml -o /tmp/autounattend.xml
-oc create configmap win2019-autounattend -n vm-demo-app \
-  --from-file=autounattend.xml=/tmp/autounattend.xml \
-  --dry-run=client -o yaml | oc apply -f -
-----
-+
-[source,role="execute"]
-----
-curl -sL https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/sysprep-unattend.xml -o /tmp/sysprep-unattend.xml
-oc create configmap win2019-sysprep -n vm-demo-app \
-  --from-file=sysprep-unattend.xml=/tmp/sysprep-unattend.xml \
-  --dry-run=client -o yaml | oc apply -f -
-----
-
-* Create the Windows installation VM with VirtIO drivers and autounattend attached:
-+
-[source,role="execute"]
-----
-cat <<'EOF' | oc apply -f -
-apiVersion: kubevirt.io/v1
-kind: VirtualMachine
-metadata:
-  name: win2019-install
-  namespace: vm-demo-app
-  labels:
-    app: windows-install
-spec:
-  runStrategy: Always
-  template:
-    metadata:
-      labels:
-        kubevirt.io/domain: win2019-install
-    spec:
-      domain:
-        cpu:
-          cores: 4
-        devices:
-          disks:
-            - disk:
-                bus: virtio
-              name: installdisk
-              bootOrder: 2
-            - cdrom:
-                bus: sata
-              name: iso
-              bootOrder: 1
-            - cdrom:
-                bus: sata
-              name: virtiocontainerdisk
-            - disk:
-                bus: virtio
-              name: sysprep
-          interfaces:
-            - masquerade: {}
-              name: default
-          inputs:
-            - type: tablet
-              bus: usb
-              name: tablet
-        resources:
-          requests:
-            memory: 8Gi
-        machine:
-          type: q35
-        features:
-          acpi: {}
-          hyperv:
-            relaxed: {}
-            vapic: {}
-            spinlocks:
-              spinlocks: 8191
-      networks:
-        - name: default
-          pod: {}
-      volumes:
-        - name: installdisk
-          persistentVolumeClaim:
-            claimName: win2019-disk
-        - name: iso
-          persistentVolumeClaim:
-            claimName: win2019-iso
-        - name: virtiocontainerdisk
-          containerDisk:
-            image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:7e06e1f52a434d4602657c920144504fbaed955d0998535bdf345716355ce83a
-        - name: sysprep
-          sysprep:
-            configMap:
-              name: win2019-autounattend
-EOF
-----
-
-[NOTE]
-====
-The `sysprep` volume uses KubeVirt's built-in sysprep disk support. It mounts the `autounattend.xml` ConfigMap as a virtual floppy drive (`A:\`), which Windows Setup reads automatically during installation. This eliminates all interactive prompts:
-
-* VirtIO storage and network drivers are loaded automatically
-* Windows Server 2019 Standard (Desktop Experience) is selected
-* Disk partitioning, hostname (`win2019-demo`), and timezone (UTC) are configured
-* Administrator password is set to `R3dH4tD3mo!`
-* RDP and WinRM are enabled
-* QEMU Guest Agent is installed at first login
-====
-
-* After Windows finishes installing and auto-logs in as Administrator (fully automated), the VM is ready. Verify the QEMU Guest Agent is reporting:
-+
-[source,role="execute"]
-----
-oc wait --for=condition=AgentConnected vmi/win2019-install -n vm-demo-app --timeout=1800s
-----
-+
-NOTE: A full automated Windows install from ISO takes 15-30 minutes. The command above waits up to 30 minutes for the QEMU Guest Agent to connect after Windows Setup completes and runs the FirstLogonCommands.
-+
-[TIP]
-====
-If the wait times out, the VM may still be running correctly -- the Guest Agent installation requires outbound internet access from the VM pod network to download the MSI package. You can verify the VM is running with `oc get vmi win2019-install -n vm-demo-app` and check the console via the OpenShift web UI. The Guest Agent is not required for the remaining modules.
-====
+* Access the Windows VM desktop through the student cluster's OpenShift console:
+** Navigate to {student_1_console_url}
+** Go to *Virtualization* -> *VirtualMachines* -> select `win2019-install` -> *Console*
+** You should see Windows Setup running (or the desktop if installation completed)
 
 * Return to the Hub terminal:
 +
@@ -395,6 +356,11 @@ If the wait times out, the VM may still be running correctly -- the Guest Agent 
 ----
 exit
 ----
+
+[TIP]
+====
+For automated Windows image building at scale, the repository includes Tekton pipeline manifests in `components/httpd-fileserver/pipelines/` that orchestrate the full ISO import, disk provisioning, and VM creation workflow.
+====
 
 ==== Generalize with Sysprep (Optional -- for golden-image cloning)
 
@@ -457,72 +423,12 @@ The VM will generalize itself and shut down. The resulting `win2019-disk` PVC is
 exit
 ----
 
-== Part 3 -- Verify VM Deployments
-
-=== Know
-
-_With both Fedora and Windows VMs deployed on the student cluster, verify they are running correctly. The Fedora VM was deployed via GitOps, and the Windows VM completed its automated ISO-based installation._
-
-=== Show
-
-* SSH to the student cluster to verify all VMs:
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
-
-* Check all VMs and their status:
-+
-[source,role="execute"]
-----
-oc get virtualmachines -n vm-demo-app
-oc get virtualmachineinstances -n vm-demo-app
-----
-
-* Verify the Fedora VM is running:
-+
-[source,role="execute"]
-----
-oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.status.phase}'
-----
-+
-Expected output: `Running`
-
-* Verify the Windows VM and DataVolumes:
-+
-[source,role="execute"]
-----
-oc get virtualmachine win2019-install -n vm-demo-app
-oc get datavolume -n vm-demo-app
-----
-
-* Access the Windows VM desktop through the student cluster's OpenShift console:
-** Navigate to {student_1_console_url}
-** Go to *Virtualization* → *VirtualMachines* → select `win2019-install` → *Console*
-** You should see the Windows Server 2019 desktop (auto-logged in as Administrator)
-
-* Return to the Hub terminal:
-+
-[source,role="execute"]
-----
-exit
-----
-
-[TIP]
-====
-For automated Windows image building at scale, the repository includes Tekton pipeline manifests in `components/httpd-fileserver/pipelines/` that orchestrate the full ISO import, disk provisioning, and VM creation workflow.
-====
-
 == Key Takeaways
 
-* GitOps-driven VM deployment with ApplicationSets provides fleet-scale automation
-* The `clusterDecisionResource` generator dynamically targets clusters via ACM Placement
-* Windows VMs use the same ISO-based installation workflow as traditional hypervisors
-* `autounattend.xml` eliminates all interactive prompts -- VirtIO drivers, RDP, Guest Agent are configured automatically
-* Sysprep generalization produces reusable golden images without SID conflicts
+* ACM-ArgoCD integration requires a custom ManagedClusterSet, explicit cluster labeling, and the `application-manager` addon
+* The `clusterDecisionResource` generator dynamically targets clusters via ACM Placement -- label changes automatically update targets
+* Both Linux and Windows VMs can be deployed entirely through GitOps (definitions in Git, synced by ArgoCD)
+* `autounattend.xml` eliminates all interactive Windows prompts -- VirtIO drivers, RDP, Guest Agent are configured automatically
 * CDI DataVolumes handle ISO import and disk provisioning declaratively
+* Sysprep generalization produces reusable golden images without SID conflicts
 * In-cluster file hosting eliminates the need for external NFS/SMB shares
-* Both Linux and Windows VMs are first-class citizens on OpenShift Virtualization
