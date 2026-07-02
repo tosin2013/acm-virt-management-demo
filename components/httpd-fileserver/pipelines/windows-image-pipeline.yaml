@@ -3,13 +3,13 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: windows-2019-image-build
-  namespace: httpd-server
+  namespace: vm-demo-app
 spec:
   description: |
     Builds a Windows Server 2019 VM disk image from an ISO uploaded to the
-    httpd-fileserver. Creates a CDI DataVolume that imports the ISO via HTTP,
-    provisions a blank disk, and creates a VirtualMachine that boots from the
-    ISO to perform installation.
+    httpd-fileserver. Creates CDI DataVolumes for the ISO and blank disk,
+    applies the autounattend ConfigMap, and creates a VirtualMachine that
+    boots from the ISO for fully automated installation.
   params:
     - name: iso-url
       type: string
@@ -29,12 +29,12 @@ spec:
       description: Name of the installation VM
     - name: namespace
       type: string
-      default: "httpd-server"
+      default: "vm-demo-app"
       description: Target namespace
   tasks:
     - name: create-iso-datavolume
       taskRef:
-        name: windows-create-datavolume
+        name: windows-apply-manifest
       params:
         - name: manifest
           value: |
@@ -58,7 +58,7 @@ spec:
 
     - name: create-disk-datavolume
       taskRef:
-        name: windows-create-datavolume
+        name: windows-apply-manifest
       params:
         - name: manifest
           value: |
@@ -79,12 +79,22 @@ spec:
                   requests:
                     storage: $(params.disk-size)
 
+    - name: create-autounattend-configmap
+      taskRef:
+        name: windows-apply-manifest
+      params:
+        - name: script
+          value: |
+            oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/configmap-autounattend.yaml -n $(params.namespace)
+            oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/examples/vm-win2019/configmap-sysprep.yaml -n $(params.namespace)
+
     - name: create-install-vm
       runAfter:
         - create-iso-datavolume
         - create-disk-datavolume
+        - create-autounattend-configmap
       taskRef:
-        name: windows-create-datavolume
+        name: windows-apply-manifest
       params:
         - name: manifest
           value: |
@@ -118,6 +128,9 @@ spec:
                         - cdrom:
                             bus: sata
                           name: virtiocontainerdisk
+                        - cdrom:
+                            bus: sata
+                          name: autounattend
                       interfaces:
                         - masquerade: {}
                           name: default
@@ -141,7 +154,7 @@ spec:
                     - name: default
                       pod: {}
                   volumes:
-                    - name: installisk
+                    - name: installdisk
                       persistentVolumeClaim:
                         claimName: win2019-disk
                     - name: iso
@@ -149,22 +162,36 @@ spec:
                         claimName: win2019-iso
                     - name: virtiocontainerdisk
                       containerDisk:
-                        image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:latest
+                        image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9:latest
+                    - name: autounattend
+                      sysprep:
+                        configMap:
+                          name: win2019-autounattend
 ---
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: windows-create-datavolume
-  namespace: httpd-server
+  name: windows-apply-manifest
+  namespace: vm-demo-app
 spec:
-  description: Apply a Kubernetes manifest (DataVolume, VM, etc.)
+  description: Apply a Kubernetes manifest or run a custom script
   params:
     - name: manifest
       type: string
       description: YAML manifest to apply
+      default: ""
+    - name: script
+      type: string
+      description: Custom shell script to run instead of applying a manifest
+      default: ""
   steps:
     - name: apply
       image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
       script: |
         #!/bin/sh
-        echo '$(params.manifest)' | oc apply -f -
+        set -e
+        if [ -n "$(params.script)" ]; then
+          eval "$(params.script)"
+        else
+          echo '$(params.manifest)' | oc apply -f -
+        fi

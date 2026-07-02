@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   generateName: windows-2019-image-build-
-  namespace: httpd-server
+  namespace: vm-demo-app
 spec:
   pipelineRef:
     name: windows-2019-image-build
@@ -17,4 +17,4 @@ spec:
     - name: vm-name
       value: "win2019-install"
     - name: namespace
-      value: "httpd-server"
+      value: "vm-demo-app"

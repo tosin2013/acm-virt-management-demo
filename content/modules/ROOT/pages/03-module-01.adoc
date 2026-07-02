@@ -215,76 +215,105 @@ You should see an application named `vm-fedora-web-{student_cluster_name}` with 
 If `No resources found` appears, wait 1-2 minutes for the `clusterDecisionResource` generator to pick up the PlacementDecision. Re-run the command until the application appears.
 ====
 
-== Part 3 -- Deploy a Windows Server 2019 VM via GitOps
+== Part 3 -- Deploy a Windows Server 2019 VM via Tekton Pipeline
 
 === Know
 
-_Windows Server workloads represent a significant portion of enterprise VM estates. OpenShift Virtualization supports Windows VMs natively. This part demonstrates deploying a Windows VM entirely through GitOps -- the VM definition, DataVolumes, and answer files all live in Git and are synced by ArgoCD._
+_Windows Server workloads represent a significant portion of enterprise VM estates. OpenShift Virtualization supports Windows VMs natively. This part demonstrates building a Windows VM golden image using an OpenShift Pipelines (Tekton) pipeline -- providing a reproducible, auditable workflow that can be triggered on demand or on a schedule._
 
-The workflow uses:
+The pipeline follows the pattern established by the https://github.com/tosin2013/openshift-virt-tekton-ref[openshift-virt-tekton-ref] project:
 
 * *CDI DataVolumes* -- import the Windows ISO from the in-cluster file server and provision a blank install disk
 * *VirtIO drivers* -- Red Hat provides a container disk with Windows VirtIO drivers, attached as a secondary CD-ROM
 * *Autounattend* -- an XML answer file that automates the entire Windows installation with no interactive prompts
-* *ArgoCD Application* -- deploys all resources to the student cluster in a single sync
+* *Tekton Pipeline* -- orchestrates the full workflow: create DataVolumes, apply ConfigMaps, create the VM
 
 [NOTE]
 ====
 *Admin pre-requisite:* The Windows Server 2019 ISO must be uploaded to the HTTP File Server before this step. If you haven't done this yet, open the file server UI at `https://httpd-server-httpd-server.{student_1_ingress_domain}`, log in with OpenShift OAuth, and upload the ISO as `win2k19.iso`.
 
-You can verify the ISO is available:
-
-[source,bash]
-----
-components/httpd-fileserver/validate-iso.sh
-----
+The in-cluster file server provides CDI-compatible URLs. Use the *copy* button next to any file in the UI to get the internal URL for DataVolume imports.
 ====
 
 **Business Value:**
 
+* *Reproducible image builds* -- every golden image is a versioned pipeline run with full audit trail
 * *Fully automated install* -- `autounattend.xml` eliminates all interactive prompts, installs VirtIO drivers, enables RDP, and installs the QEMU Guest Agent
 * *Golden-image ready* -- a built-in sysprep step generalizes the finished VM for cloning
-* *GitOps-managed* -- the entire VM stack (disk provisioning, answer files, VM definition) is version-controlled and auditable
+* *Pipeline-as-code* -- the pipeline definition lives in Git alongside the VM manifests
 * *In-cluster hosting* -- ISOs are served from within the cluster, no external file shares needed
 
 === Show
 
-* Apply an ArgoCD Application that deploys the Windows VM stack (DataVolumes, ConfigMaps, and VirtualMachine) to the student cluster:
+* SSH to the student cluster to set up the pipeline:
 +
 [source,role="execute",subs="attributes+"]
 ----
-cat <<'EOF' | oc apply -f -
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: vm-win2019-{student_cluster_name}
-  namespace: openshift-gitops
-spec:
-  project: default
-  source:
-    repoURL: 'https://github.com/tosin2013/acm-virt-management-demo.git'
-    targetRevision: main
-    path: examples/vm-win2019
-  destination:
-    server: 'https://cluster-proxy-addon-user.multicluster-engine.svc.cluster.local:9092/{student_cluster_name}'
-    namespace: vm-demo-app
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-EOF
+{student_1_ssh_command}
 ----
++
+Password: `{student_1_bastion_ssh_password}`
 
-* Watch ArgoCD sync the Windows VM resources:
+* Verify OpenShift Pipelines is available:
 +
 [source,role="execute"]
 ----
-oc get applications.argoproj.io -n openshift-gitops
+oc get tektonconfig config -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+echo
 ----
 +
-You should see both `vm-fedora-web-{student_cluster_name}` and `vm-win2019-{student_cluster_name}` applications. The Windows app will show `Synced` once all resources are created on the student cluster.
+Expected output: `True`
+
+* Apply the Windows image build pipeline and task:
++
+[source,role="execute"]
+----
+oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/components/httpd-fileserver/pipelines/windows-image-pipeline.yaml
+----
+
+* Verify the pipeline and task were created:
++
+[source,role="execute"]
+----
+oc get pipeline,task -n vm-demo-app
+----
++
+You should see the `windows-2019-image-build` Pipeline and `windows-apply-manifest` Task.
+
+* Start the pipeline run to build the Windows VM:
++
+[source,role="execute"]
+----
+oc create -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/components/httpd-fileserver/pipelines/windows-image-pipelinerun.yaml
+----
+
+* Monitor the pipeline progress:
++
+[source,role="execute"]
+----
+oc get pipelinerun -n vm-demo-app -w
+----
++
+The pipeline creates DataVolumes for the ISO and blank disk in parallel, applies the autounattend ConfigMap, then creates the VirtualMachine. The DataVolume creation tasks complete in 1-5 minutes depending on ISO size and storage performance.
++
+Press `Ctrl+C` to stop watching once all tasks show `Succeeded`.
+
+* Verify the VM was created and is booting from the ISO:
++
+[source,role="execute"]
+----
+oc get datavolume -n vm-demo-app
+oc get virtualmachine win2019-install -n vm-demo-app
+----
++
+The `win2019-iso` DataVolume should show `Succeeded` (ISO imported). The `win2019-disk` DataVolume shows `Succeeded` (blank disk provisioned). The VM should be in `Running` state (Windows is installing from the ISO).
+
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
 
 [NOTE]
 ====
@@ -304,7 +333,7 @@ The full installation takes 15-30 minutes from ISO boot to desktop.
 
 === Know
 
-_With both Fedora and Windows VMs deployed to the student cluster via GitOps, verify they are running correctly. The Fedora VM was deployed via ApplicationSet and the Windows VM via a direct ArgoCD Application -- both managed entirely through Git._
+_With both Fedora and Windows VMs deployed to the student cluster, verify they are running correctly. The Fedora VM was deployed via ArgoCD ApplicationSet and the Windows VM via a Tekton pipeline -- demonstrating two complementary deployment models._
 
 === Show
 
@@ -359,7 +388,7 @@ exit
 
 [TIP]
 ====
-For automated Windows image building at scale, the repository includes Tekton pipeline manifests in `components/httpd-fileserver/pipelines/` that orchestrate the full ISO import, disk provisioning, and VM creation workflow.
+You can also view the pipeline run in the OpenShift console under *Pipelines* -> *PipelineRuns* in the `vm-demo-app` namespace. The console provides a visual graph of the pipeline stages and their status.
 ====
 
 ==== Generalize with Sysprep (Optional -- for golden-image cloning)
@@ -427,8 +456,9 @@ exit
 
 * ACM-ArgoCD integration requires a custom ManagedClusterSet, explicit cluster labeling, and the `application-manager` addon
 * The `clusterDecisionResource` generator dynamically targets clusters via ACM Placement -- label changes automatically update targets
-* Both Linux and Windows VMs can be deployed entirely through GitOps (definitions in Git, synced by ArgoCD)
+* Linux VMs are deployed fleet-wide via ArgoCD ApplicationSets; Windows VMs are built via Tekton pipelines for reproducible golden images
 * `autounattend.xml` eliminates all interactive Windows prompts -- VirtIO drivers, RDP, Guest Agent are configured automatically
 * CDI DataVolumes handle ISO import and disk provisioning declaratively
+* Tekton pipelines provide auditable, repeatable image-building workflows that can be triggered on demand or on a schedule
 * Sysprep generalization produces reusable golden images without SID conflicts
 * In-cluster file hosting eliminates the need for external NFS/SMB shares
