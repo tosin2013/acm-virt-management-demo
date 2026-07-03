@@ -21,7 +21,7 @@ Development teams need to deploy VM workloads across multiple clusters. The path
 **Technical Solution:**
 RHACM provides the `open-cluster-management:subscription-admin` ClusterRole that allows users to create Git Subscriptions deploying resources across multiple namespaces -- without granting `cluster-admin`.
 
-Combined with OpenShift GitOps (ArgoCD), the Git repository becomes the immutable single source of truth. Developers push to Git; ArgoCD syncs to clusters. No human ever runs `oc apply` directly against a production cluster.
+Combined with OpenShift GitOps (ArgoCD), the Git repository becomes the immutable single source of truth. Developers push to Git; ACM Subscriptions sync to clusters. No human ever runs `oc apply` directly against a production cluster.
 
 === Show
 
@@ -33,6 +33,8 @@ NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. 
 ----
 oc auth can-i --list --as=demo-deployer | grep -E "cluster-admin|managedcluster"
 ----
++
+Expected: no results -- this user has no cluster-wide destructive permissions.
 
 * Apply the subscription-admin binding from the rbac/ directory:
 +
@@ -45,25 +47,25 @@ oc apply -f rbac/subscription-admin-binding.yaml
 +
 [source,role="execute"]
 ----
-oc get clusterrolebinding gitops-subscription-admin -o yaml
+oc get clusterrolebinding gitops-subscription-admin -o wide
 ----
 
-== Part 2 -- Deploying Via Git Subscription
+== Part 2 -- Deploy a VM Via Git Subscription
 
 === Know
 
-_With `subscription-admin` bound, a user can create RHACM Subscriptions that deploy resources from a Git repository to any namespace across the fleet. The subscription model provides:_
+_With `subscription-admin` bound, a user can create RHACM Subscriptions that deploy resources from a Git repository to managed clusters -- without cluster-admin. This is a real deployment: an actual VM will boot on the managed cluster, deployed entirely through Git._
+
+The subscription model provides:
 
 * *Declarative deployment* -- desired state is defined in Git, not in CLI commands
 * *Automatic sync* -- changes pushed to Git are automatically detected and applied
 * *Audit trail* -- every deployment change is a Git commit with author, timestamp, and diff
-* *Rollback capability* -- reverting a deployment is a Git revert
-
-This model eliminates the need for developers to have direct CLI access to managed clusters entirely.
+* *Cross-cluster reach* -- a single Subscription deploys to every cluster matching the Placement
 
 === Show
 
-* Create a Channel resource pointing to the Git repository:
+* Create a Channel resource pointing to the demo Git repository:
 +
 [source,role="execute"]
 ----
@@ -79,7 +81,7 @@ spec:
 EOF
 ----
 
-* Create a Subscription that deploys VM workloads from the repository. The Subscription must be in the same namespace as the Placement it references:
+* Create a Subscription that deploys a Fedora VM running nginx from the `subscriptions/vm-demo-nginx/` path in the repository:
 +
 [source,role="execute"]
 ----
@@ -87,10 +89,10 @@ cat <<EOF | oc apply -f -
 apiVersion: apps.open-cluster-management.io/v1
 kind: Subscription
 metadata:
-  name: vm-workload-subscription
+  name: vm-nginx-subscription
   namespace: open-cluster-management-policies
   annotations:
-    apps.open-cluster-management.io/git-path: policies/
+    apps.open-cluster-management.io/git-path: subscriptions/vm-demo-nginx/
     apps.open-cluster-management.io/git-branch: main
 spec:
   channel: open-cluster-management-policies/acm-virt-demo-channel
@@ -101,29 +103,85 @@ spec:
 EOF
 ----
 
-* Verify the subscription is propagating to managed clusters:
+* Verify the Subscription is propagating:
 +
 [source,role="execute"]
 ----
-oc get subscription vm-workload-subscription -n open-cluster-management-policies -o yaml | grep -A5 status
+oc get subscription vm-nginx-subscription -n open-cluster-management-policies
 ----
++
+Wait for the `PHASE` to show `Propagated`.
 
-== Part 3 -- Proving Non-Admin Deployment Works
+== Part 3 -- Verify the VM is Running
 
 === Know
 
-_The most compelling demonstration is showing that the deployment succeeded while the deploying user cannot perform destructive actions. This proves that productivity and security are not mutually exclusive._
+_The most compelling part of this demonstration is proving that a real VM booted on the managed cluster -- deployed entirely through Git, by a user who never had cluster-admin. The VM namespace, the VirtualMachine, and the Service were all created by the ACM Subscription controller._
 
 === Show
 
-* Verify the deployment was successful on the managed cluster -- the VM policies are applied:
+* SSH to the managed cluster bastion:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
+
+* Verify the namespace was created by the Subscription:
 +
 [source,role="execute"]
 ----
-oc get policies -n open-cluster-management-policies
+oc get namespace vm-subscription-demo -o jsonpath='{.metadata.labels}' | python3 -m json.tool
+----
++
+Note the `app.kubernetes.io/managed-by: acm-subscription` label -- proving this namespace was created by the Git Subscription, not by an admin.
+
+* Verify the VM is running:
++
+[source,role="execute"]
+----
+oc get vm,vmi -n vm-subscription-demo
+----
++
+Expected: `nginx-subscription-vm` shows `Running` with `READY: True`.
+
+[TIP]
+====
+The VM uses a container disk (`quay.io/containerdisks/fedora:latest`), so it boots in about 60-90 seconds. If the VM is not yet running, wait a moment and re-check.
+====
+
+* Confirm the nginx web server inside the VM is serving the subscription-deployed content:
++
+[source,role="execute"]
+----
+curl -s $(oc get vmi nginx-subscription-vm -n vm-subscription-demo \
+  -o jsonpath='{.status.interfaces[0].ipAddress}')
+----
++
+Expected output:
++
+----
+Deployed via ACM Git Subscription - no cluster-admin required
 ----
 
-* Now prove that the same user cannot perform destructive cluster operations:
+* Return to the Hub terminal:
++
+[source,role="execute"]
+----
+exit
+----
+
+== Part 4 -- Proving Non-Admin Deployment Works
+
+=== Know
+
+_The final proof: the user who deployed a running VM across the fleet cannot perform destructive cluster operations. Productivity and security are not mutually exclusive._
+
+=== Show
+
+* Verify the deployer cannot delete managed clusters:
 +
 [source,role="execute"]
 ----
@@ -132,7 +190,7 @@ oc auth can-i delete managedclusters --as=demo-deployer
 +
 Expected output: `no`
 
-* Verify the deployer cannot destroy managed clusters:
+* Verify the deployer cannot destroy managed cluster sets:
 +
 [source,role="execute"]
 ----
@@ -141,20 +199,30 @@ oc auth can-i delete managedclustersets --as=demo-deployer
 +
 Expected output: `no`
 
-[NOTE]
-====
-The `subscription-admin` role grants namespace management permissions (needed for cross-namespace Git deployments), but does NOT grant cluster lifecycle destruction (`delete managedclusters`, `delete managedclustersets`). Module 8 demonstrates how to further restrict even these operational users from cluster destruction.
-====
+* Verify the deployer cannot delete nodes:
++
+[source,role="execute"]
+----
+oc auth can-i delete nodes --as=demo-deployer
+----
++
+Expected output: `no`
 
 [IMPORTANT]
 ====
-**Key message for the customer:** "This user just deployed VM governance policies across your entire fleet via Git -- without cluster-admin. They can deploy workloads but cannot destroy managed clusters. Git is the single source of truth, not human CLI access."
+**Key message for the customer:** "This user just deployed a running VM to a managed cluster via Git -- without cluster-admin. The VM is serving traffic right now. But that same user cannot delete managed clusters, cannot destroy cluster sets, and cannot remove nodes. Git is the single source of truth, not human CLI access. This is the zero-trust deployment model."
+====
+
+[NOTE]
+====
+The `subscription-admin` role grants the permissions needed for cross-namespace Git deployments, but does NOT grant cluster lifecycle destruction (`delete managedclusters`, `delete managedclustersets`). Module 8 demonstrates how to further restrict even these operational users from cluster destruction.
 ====
 
 == Key Takeaways
 
-* `subscription-admin` enables cross-namespace deployment without `cluster-admin`
+* `subscription-admin` enables cross-namespace VM deployment without `cluster-admin`
+* A real VM was deployed, booted, and served traffic -- entirely through a Git Subscription
 * Git becomes the immutable audit trail for all deployment changes
-* ArgoCD and RHACM Subscriptions provide automatic sync and drift correction
+* RHACM Subscriptions provide automatic sync from Git to managed clusters
 * Developers never need direct CLI access to production clusters
 * Productivity and security are complementary, not competing concerns

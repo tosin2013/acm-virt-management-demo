@@ -2,7 +2,6 @@ apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
   name: nginx-subscription-vm
-  namespace: vm-subscription-demo
   labels:
     app: nginx-subscription
     deployed-by: acm-subscription
