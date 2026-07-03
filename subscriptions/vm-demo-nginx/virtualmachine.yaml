@@ -1,0 +1,46 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: nginx-subscription-vm
+  namespace: vm-subscription-demo
+  labels:
+    app: nginx-subscription
+    deployed-by: acm-subscription
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: nginx-subscription-vm
+        app: nginx-subscription
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        resources:
+          requests:
+            memory: 1Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+      volumes:
+        - containerDisk:
+            image: quay.io/containerdisks/fedora:latest
+          name: rootdisk
+        - cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              password: redhat
+              chpasswd:
+                expire: false
+              packages:
+                - nginx
+              runcmd:
+                - systemctl enable --now nginx
+                - echo "Deployed via ACM Git Subscription - no cluster-admin required" > /usr/share/nginx/html/index.html
+          name: cloudinitdisk
