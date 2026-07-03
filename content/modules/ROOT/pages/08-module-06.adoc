@@ -65,7 +65,36 @@ The subscription model provides:
 
 === Show
 
-* Create a Channel resource pointing to the demo Git repository:
+* Create a dedicated namespace for the subscription deployment, bind the ManagedClusterSet so the Placement can select clusters, and create the Placement:
++
+[source,role="execute"]
+----
+oc create namespace vm-subscription-demo
+
+cat <<EOF | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: virt-clusters
+  namespace: vm-subscription-demo
+spec:
+  clusterSet: virt-clusters
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: virt-subscription-placement
+  namespace: vm-subscription-demo
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            virtualization-enabled: "true"
+EOF
+----
+
+* Create a Channel pointing to the demo Git repository and a Subscription that deploys a Fedora VM running nginx from the `subscriptions/vm-demo-nginx/` path:
 +
 [source,role="execute"]
 ----
@@ -74,31 +103,24 @@ apiVersion: apps.open-cluster-management.io/v1
 kind: Channel
 metadata:
   name: acm-virt-demo-channel
-  namespace: open-cluster-management-policies
+  namespace: vm-subscription-demo
 spec:
   type: Git
   pathname: https://github.com/tosin2013/acm-virt-management-demo.git
-EOF
-----
-
-* Create a Subscription that deploys a Fedora VM running nginx from the `subscriptions/vm-demo-nginx/` path in the repository:
-+
-[source,role="execute"]
-----
-cat <<EOF | oc apply -f -
+---
 apiVersion: apps.open-cluster-management.io/v1
 kind: Subscription
 metadata:
   name: vm-nginx-subscription
-  namespace: open-cluster-management-policies
+  namespace: vm-subscription-demo
   annotations:
     apps.open-cluster-management.io/git-path: subscriptions/vm-demo-nginx/
     apps.open-cluster-management.io/git-branch: main
 spec:
-  channel: open-cluster-management-policies/acm-virt-demo-channel
+  channel: vm-subscription-demo/acm-virt-demo-channel
   placement:
     placementRef:
-      name: virt-enabled-clusters
+      name: virt-subscription-placement
       kind: Placement
 EOF
 ----
@@ -107,10 +129,13 @@ EOF
 +
 [source,role="execute"]
 ----
-oc get subscription vm-nginx-subscription -n open-cluster-management-policies
+oc get subscription vm-nginx-subscription -n vm-subscription-demo
 ----
 +
 Wait for the `PHASE` to show `Propagated`.
+
+.ACM Search showing the vm-nginx-subscription in Propagated state
+image::module-06-subscription-yaml.png[ACM Subscription YAML showing Propagated status]
 
 == Part 3 -- Verify the VM is Running
 
@@ -129,15 +154,6 @@ _The most compelling part of this demonstration is proving that a real VM booted
 +
 Password: `{student_1_bastion_ssh_password}`
 
-* Verify the namespace was created by the Subscription:
-+
-[source,role="execute"]
-----
-oc get namespace vm-subscription-demo -o jsonpath='{.metadata.labels}' | python3 -m json.tool
-----
-+
-Note the `app.kubernetes.io/managed-by: acm-subscription` label -- proving this namespace was created by the Git Subscription, not by an admin.
-
 * Verify the VM is running:
 +
 [source,role="execute"]
@@ -149,22 +165,13 @@ Expected: `nginx-subscription-vm` shows `Running` with `READY: True`.
 
 [TIP]
 ====
-The VM uses a container disk (`quay.io/containerdisks/fedora:latest`), so it boots in about 60-90 seconds. If the VM is not yet running, wait a moment and re-check.
+The VM uses a container disk (`quay.io/containerdisks/fedora:latest`) with cloud-init installing nginx. The VM boots in about 60-90 seconds; nginx installation takes an additional minute. If the VM is not yet running, wait a moment and re-check.
 ====
 
-* Confirm the nginx web server inside the VM is serving the subscription-deployed content:
-+
-[source,role="execute"]
-----
-curl -s $(oc get vmi nginx-subscription-vm -n vm-subscription-demo \
-  -o jsonpath='{.status.interfaces[0].ipAddress}')
-----
-+
-Expected output:
-+
-----
-Deployed via ACM Git Subscription - no cluster-admin required
-----
+.Fleet Virtualization console showing the subscription-deployed VM running on student-1
+image::module-06-vm-fleet-virt.png[Fleet Virtualization showing nginx-subscription-vm running]
+
+* You can also verify the VM from the ACM console: switch to the *Fleet Virtualization* perspective and expand *student-1* → *vm-subscription-demo* to see the `nginx-subscription-vm` running alongside your other VMs.
 
 * Return to the Hub terminal:
 +
