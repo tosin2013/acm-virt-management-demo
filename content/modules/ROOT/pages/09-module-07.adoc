@@ -199,6 +199,12 @@ Log in as:
 
 image::module-07-vm-operator-console.png[VM operator's restricted console view showing only Fleet Virtualization access]
 
+* Click on a VM (e.g., `win2019-install`) and open the *Actions* dropdown to show the available operations:
+
+image::module-07-vm-operator-actions.png[VM operator can Stop Restart Reset and Console into VMs from the Actions menu]
+
+The `vm-operator` user can **Stop**, **Restart**, **Reset**, access the **Console**, and view VM metrics -- exactly the operations defined in the ClusterPermission. They cannot Clone, Delete, or perform Migration actions that require broader permissions.
+
 [TIP]
 ====
 Open the admin console and the vm-operator console side by side to show the contrast. The admin sees the full RHACM feature set; the vm-operator sees only what they need -- Fleet Virtualization for their assigned clusters.
