@@ -385,8 +385,6 @@ The `win2019-iso` DataVolume should show `Succeeded` (ISO imported). The `win201
 ** Go to *Virtualization* -> *VirtualMachines* -> select `win2019-install` -> *Console*
 ** You should see Windows Setup running (or the desktop if installation completed)
 
-image::module-01-windows-console.png[Windows VM console showing installation progress]
-
 image::module-01-windows-desktop.png[Windows Server 2019 desktop with VirtIO drivers installed]
 
 * Return to the Hub terminal:
