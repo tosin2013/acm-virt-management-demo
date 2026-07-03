@@ -129,22 +129,54 @@ This is the exact capability enterprises need: their VM operations team can star
 +
 Password: `{student_1_bastion_ssh_password}`
 
-* As a vm-operators group member, demonstrate permitted actions:
+* Verify the ClusterRole grants the expected kubevirt.io permissions:
 +
 [source,role="execute"]
 ----
-oc auth can-i get virtualmachines.kubevirt.io -n vm-production --as-group=vm-operators --as=vm-user
+oc get clusterrole vm-editor-permission -o jsonpath='{range .rules[*]}{.apiGroups[*]}{"\t"}{.resources[*]}{"\t"}{.verbs[*]}{"\n"}{end}'
 ----
 +
-Expected output: `yes`
+You should see rules granting `get`, `list`, `watch`, `update`, `patch` for `kubevirt.io` resources (virtualmachines, virtualmachineinstances) and `start`, `stop`, `restart`, `console` subresources.
+
+* As a vm-operators group member, demonstrate permitted actions using a `SubjectAccessReview`:
++
+[source,role="execute"]
+----
+oc create -f - -o jsonpath='{.status.allowed}' <<'EOF' && echo
+apiVersion: authorization.k8s.io/v1
+kind: SubjectAccessReview
+spec:
+  user: vm-user
+  groups: ["vm-operators"]
+  resourceAttributes:
+    verb: get
+    group: kubevirt.io
+    resource: virtualmachines
+    namespace: vm-production
+EOF
+----
++
+Expected output: `true`
 
 +
 [source,role="execute"]
 ----
-oc auth can-i update virtualmachines/start.subresources.kubevirt.io -n vm-production --as-group=vm-operators --as=vm-user
+oc create -f - -o jsonpath='{.status.allowed}' <<'EOF' && echo
+apiVersion: authorization.k8s.io/v1
+kind: SubjectAccessReview
+spec:
+  user: vm-user
+  groups: ["vm-operators"]
+  resourceAttributes:
+    verb: update
+    group: subresources.kubevirt.io
+    resource: virtualmachines
+    subresource: start
+    namespace: vm-production
+EOF
 ----
 +
-Expected output: `yes`
+Expected output: `true`
 
 * Now demonstrate denied actions -- the same user cannot access cluster-level resources:
 +

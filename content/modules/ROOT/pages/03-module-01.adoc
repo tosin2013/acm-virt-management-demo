@@ -135,6 +135,8 @@ echo
 ----
 +
 Expected output: `Added managed clusters [student-1] to gitops namespace openshift-gitops`
+
+image::module-01-gitopscluster-registered.png[ArgoCD showing the student cluster registered]
 +
 [TIP]
 ====
@@ -209,6 +211,8 @@ oc get applications.argoproj.io -n openshift-gitops
 ----
 +
 You should see an application named `vm-fedora-web-{student_cluster_name}` with Sync Status `Synced` and Health Status `Healthy`.
+
+image::module-01-argocd-appset-synced.png[ArgoCD application synced and healthy]
 +
 [TIP]
 ====
@@ -298,6 +302,8 @@ The pipeline creates DataVolumes for the ISO and blank disk in parallel, applies
 +
 Press `Ctrl+C` to stop watching once all tasks show `Succeeded`.
 
+image::module-01-pipeline-graph.png[Tekton pipeline run with all tasks succeeded]
+
 * Verify the VM was created and is booting from the ISO:
 +
 [source,role="execute"]
@@ -378,6 +384,10 @@ The `win2019-iso` DataVolume should show `Succeeded` (ISO imported). The `win201
 ** Navigate to {student_1_console_url}
 ** Go to *Virtualization* -> *VirtualMachines* -> select `win2019-install` -> *Console*
 ** You should see Windows Setup running (or the desktop if installation completed)
+
+image::module-01-windows-console.png[Windows VM console showing installation progress]
+
+image::module-01-windows-desktop.png[Windows Server 2019 desktop with VirtIO drivers installed]
 
 * Return to the Hub terminal:
 +

@@ -31,8 +31,8 @@ spec:
             - cdrom:
                 bus: sata
               name: virtiocontainerdisk
-            - disk:
-                bus: virtio
+            - cdrom:
+                bus: sata
               name: sysprep
           interfaces:
             - masquerade: {}

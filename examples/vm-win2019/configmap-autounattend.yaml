@@ -25,36 +25,40 @@ data:
           <UserLocale>en-US</UserLocale>
         </component>
 
+        <component name="Microsoft-Windows-PnpCustomizationsWinPE"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS"
+                   xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+          <DriverPaths>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="1">
+              <Path>E:\viostor\2k19\amd64</Path>
+            </PathAndCredentials>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="2">
+              <Path>E:\NetKVM\2k19\amd64</Path>
+            </PathAndCredentials>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="3">
+              <Path>E:\vioscsi\2k19\amd64</Path>
+            </PathAndCredentials>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="4">
+              <Path>E:\Balloon\2k19\amd64</Path>
+            </PathAndCredentials>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="5">
+              <Path>E:\vioserial\2k19\amd64</Path>
+            </PathAndCredentials>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="6">
+              <Path>E:\qxldod\2k19\amd64</Path>
+            </PathAndCredentials>
+          </DriverPaths>
+        </component>
+
         <component name="Microsoft-Windows-Setup"
                    processorArchitecture="amd64"
                    publicKeyToken="31bf3856ad364e35"
                    language="neutral"
                    versionScope="nonSxS"
                    xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-
-          <DriverPaths>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="1">
-              <Path>E:\amd64\w2k19</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="2">
-              <Path>E:\NetKVM\w2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="3">
-              <Path>E:\viostor\w2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="4">
-              <Path>E:\vioscsi\w2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="5">
-              <Path>E:\Balloon\w2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="6">
-              <Path>E:\vioserial\w2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="7">
-              <Path>E:\qxldod\w2k19\amd64</Path>
-            </PathAndCredentials>
-          </DriverPaths>
 
           <DiskConfiguration>
             <Disk wcm:action="add">
@@ -63,16 +67,11 @@ data:
               <CreatePartitions>
                 <CreatePartition wcm:action="add">
                   <Order>1</Order>
-                  <Size>100</Size>
-                  <Type>EFI</Type>
+                  <Size>350</Size>
+                  <Type>Primary</Type>
                 </CreatePartition>
                 <CreatePartition wcm:action="add">
                   <Order>2</Order>
-                  <Size>128</Size>
-                  <Type>MSR</Type>
-                </CreatePartition>
-                <CreatePartition wcm:action="add">
-                  <Order>3</Order>
                   <Extend>true</Extend>
                   <Type>Primary</Type>
                 </CreatePartition>
@@ -81,12 +80,13 @@ data:
                 <ModifyPartition wcm:action="add">
                   <Order>1</Order>
                   <PartitionID>1</PartitionID>
-                  <Format>FAT32</Format>
-                  <Label>EFI</Label>
+                  <Format>NTFS</Format>
+                  <Label>System Reserved</Label>
+                  <Active>true</Active>
                 </ModifyPartition>
                 <ModifyPartition wcm:action="add">
                   <Order>2</Order>
-                  <PartitionID>3</PartitionID>
+                  <PartitionID>2</PartitionID>
                   <Format>NTFS</Format>
                   <Label>Windows</Label>
                   <Letter>C</Letter>
@@ -105,7 +105,7 @@ data:
               </InstallFrom>
               <InstallTo>
                 <DiskID>0</DiskID>
-                <PartitionID>3</PartitionID>
+                <PartitionID>2</PartitionID>
               </InstallTo>
             </OSImage>
           </ImageInstall>
@@ -221,8 +221,8 @@ data:
             </SynchronousCommand>
             <SynchronousCommand wcm:action="add">
               <Order>2</Order>
-              <CommandLine>cmd /c pnputil /add-driver E:\Balloon\w2k19\amd64\*.inf /install</CommandLine>
-              <Description>Install Balloon driver</Description>
+              <CommandLine>msiexec /i E:\virtio-win-gt-x64.msi /qn /passive /norestart</CommandLine>
+              <Description>Install VirtIO guest tools</Description>
             </SynchronousCommand>
             <SynchronousCommand wcm:action="add">
               <Order>3</Order>
@@ -231,8 +231,8 @@ data:
             </SynchronousCommand>
             <SynchronousCommand wcm:action="add">
               <Order>4</Order>
-              <CommandLine>powershell -Command "Set-ExecutionPolicy RemoteSigned -Force"</CommandLine>
-              <Description>Set execution policy</Description>
+              <CommandLine>reg add "HKLM\SOFTWARE\Microsoft\ServerManager" /v DoNotOpenServerManagerAtLogon /t REG_DWORD /d 1 /f</CommandLine>
+              <Description>Disable Server Manager at logon</Description>
             </SynchronousCommand>
           </FirstLogonCommands>
         </component>

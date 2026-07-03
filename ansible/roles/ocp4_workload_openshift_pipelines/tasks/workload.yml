@@ -28,6 +28,19 @@
     - r_tekton_config.resources | length > 0
     - r_tekton_config.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length > 0
 
+- name: Enable Pipelines console plugin
+  kubernetes.core.k8s_json_patch:
+    api_version: operator.openshift.io/v1
+    kind: Console
+    name: cluster
+    patch:
+      - op: add
+        path: /spec/plugins/-
+        value: pipelines-console-plugin
+  register: r_console_plugin
+  failed_when: false
+  changed_when: r_console_plugin is not failed
+
 - name: Save AgnosticD user data
   agnosticd.core.agnosticd_user_info:
     msg: "OpenShift Pipelines operator installed (channel: {{ ocp4_workload_openshift_pipelines_channel }})"

@@ -179,11 +179,14 @@ _The right-sizing dashboards provide the data; the next step is acting on it. Th
 
 * The *fedora-web* VM is a classic overestimation case: it runs a simple httpd service but was allocated 1 vCPU and 2 GiB memory. The right-sizing data shows it actually uses ~9 millicores of CPU and ~377 MiB of memory.
 
-* First, pause ArgoCD auto-sync on the Hub so the resize is not immediately reverted by GitOps self-heal:
+* First, suspend the ApplicationSet on the Hub so ArgoCD does not revert the manual resize. This prevents the ApplicationSet controller from reconciling the Application spec:
 +
 [source,role="execute"]
 ----
-oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge -p '{"spec":{"syncPolicy":null}}'
+oc patch applicationset vm-fedora-web -n openshift-gitops --type=merge \
+  -p '{"spec":{"template":{"spec":{"syncPolicy":null}}}}'
+oc patch applications.argoproj.io vm-fedora-web-student-1 -n openshift-gitops --type=merge \
+  -p '{"spec":{"syncPolicy":null}}'
 ----
 
 * SSH to the managed cluster bastion:
@@ -223,6 +226,9 @@ echo
 +
 Expected: `200` -- the web server is unaffected by the memory reduction.
 
+.Right-sizing dashboard reflecting the reduced memory allocation
+image::right-sizing-post-resize.png[Grafana showing fedora-web with 512Mi after right-sizing]
+
 * Return to the Hub terminal:
 +
 [source,role="execute"]
@@ -230,11 +236,13 @@ Expected: `200` -- the web server is unaffected by the memory reduction.
 exit
 ----
 
-* Re-enable ArgoCD auto-sync:
+* Re-enable ArgoCD auto-sync by restoring the ApplicationSet template and Application:
 +
 [source,role="execute"]
 ----
-oc patch application vm-fedora-web-student-1 -n openshift-gitops --type=merge \
+oc patch applicationset vm-fedora-web -n openshift-gitops --type=merge \
+  -p '{"spec":{"template":{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true},"syncOptions":["CreateNamespace=true"]}}}}}'
+oc patch applications.argoproj.io vm-fedora-web-student-1 -n openshift-gitops --type=merge \
   -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true},"syncOptions":["CreateNamespace=true"]}}}'
 ----
 

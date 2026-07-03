@@ -220,7 +220,7 @@ oc get schedule -n openshift-adp
 oc delete schedule vm-critical-backup -n openshift-adp
 ----
 
-* Wait 30-60 seconds, then verify the schedule was automatically recreated:
+* Wait 2-3 minutes for ACM policy remediation to detect the drift and recreate the resource, then verify:
 +
 [source,role="execute"]
 ----
@@ -274,6 +274,10 @@ oc apply -f policies/vm-resource-guardrails-policy.yaml
 
 image::acm-governance-policies-compliant.png[ACM Governance showing Compliant policies]
 
+You can also view the overall governance posture from the *Overview* tab, which shows policy violations mapped to NIST SP 800-53 categories and controls:
+
+image::acm-governance-overview.png[ACM Governance Overview showing compliance posture across clusters]
+
 * SSH to the student cluster bastion to verify the resources on the managed cluster:
 +
 [source,role="execute",subs="attributes+"]
@@ -321,6 +325,11 @@ oc apply -f policies/vm-security-hardening-policy.yaml
 ----
 
 * Verify the policies in the ACM console under *Governance* -> *Policies*
++
+[TIP]
+====
+The `vm-eviction-strategy` policy uses `remediationAction: inform` and may show a blank compliance state if no VMs currently have eviction strategy misconfigurations. This is expected -- the policy will report `NonCompliant` only when a VM is detected without `LiveMigrate` eviction strategy.
+====
 
 * SSH to the student cluster bastion to verify the hardened VM preference exists:
 +

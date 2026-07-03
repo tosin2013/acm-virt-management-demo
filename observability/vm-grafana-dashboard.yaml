@@ -70,7 +70,7 @@ data:
           "datasource": "Observatorium",
           "targets": [
             {
-              "expr": "avg by (cluster) (kubevirt:vm_cpu_usage_ratio)",
+              "expr": "sum by (cluster) (rate(kubevirt_vmi_cpu_usage_seconds_total[10m]))",
               "legendFormat": "{{ cluster }}",
               "refId": "A"
             }
@@ -87,7 +87,7 @@ data:
                 "showPoints": "auto",
                 "axisPlacement": "auto"
               },
-              "unit": "percentunit"
+              "unit": "short"
             },
             "overrides": []
           },
@@ -103,7 +103,7 @@ data:
         },
         {
           "id": 3,
-          "title": "VM Memory Usage Ratio by Cluster",
+          "title": "VM Memory Usage by Cluster",
           "type": "timeseries",
           "gridPos": {
             "h": 8,
@@ -114,7 +114,7 @@ data:
           "datasource": "Observatorium",
           "targets": [
             {
-              "expr": "avg by (cluster) (kubevirt:vm_memory_usage_ratio)",
+              "expr": "sum by (cluster) (kubevirt_vmi_memory_used_bytes)",
               "legendFormat": "{{ cluster }}",
               "refId": "A"
             }
@@ -131,7 +131,7 @@ data:
                 "showPoints": "auto",
                 "axisPlacement": "auto"
               },
-              "unit": "percentunit"
+              "unit": "bytes"
             },
             "overrides": []
           },
@@ -147,7 +147,7 @@ data:
         },
         {
           "id": 4,
-          "title": "Top 10 Over-Provisioned VMs (CPU)",
+          "title": "Top 10 Over-Provisioned VMs (Memory Available %)",
           "type": "table",
           "gridPos": {
             "h": 8,
@@ -158,7 +158,7 @@ data:
           "datasource": "Observatorium",
           "targets": [
             {
-              "expr": "topk(10, kubevirt:vm_cpu_usage_ratio < 0.5)",
+              "expr": "topk(10, kubevirt_vmi_memory_available_bytes / kubevirt_vmi_memory_domain_bytes)",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -200,7 +200,7 @@ data:
                   "cluster": "Cluster",
                   "name": "VM Name",
                   "namespace": "Namespace",
-                  "Value": "CPU Usage Ratio"
+                  "Value": "Memory Available %"
                 }
               }
             }

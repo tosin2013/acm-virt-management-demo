@@ -86,6 +86,8 @@ This drill-down capability eliminates the need for direct `oc` access to managed
 ** Node CPU and memory utilization
 ** VM distribution across nodes
 
+image::grafana-single-cluster-view.png[Grafana Single Cluster View showing per-node VM metrics]
+
 * Select a specific VM to view its individual metrics:
 ** CPU usage over time
 ** Memory working set vs. requested
@@ -97,7 +99,7 @@ This drill-down capability eliminates the need for direct `oc` access to managed
 [source,role="execute"]
 ----
 oc exec -n open-cluster-management-observability deploy/observability-thanos-query -c thanos-query -- \
-  curl -s 'http://localhost:9090/api/v1/query?query=kubevirt:vm_cpu_usage_ratio' | python3 -m json.tool
+  curl -s 'http://localhost:9090/api/v1/query?query=kubevirt_vmi_memory_available_bytes' | python3 -m json.tool
 ----
 
 == Part 3 -- Identifying Right-Sizing Opportunities

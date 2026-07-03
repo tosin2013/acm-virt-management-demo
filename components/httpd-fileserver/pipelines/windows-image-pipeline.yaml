@@ -162,7 +162,7 @@ spec:
                         claimName: win2019-iso
                     - name: virtiocontainerdisk
                       containerDisk:
-                        image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9:latest
+                        image: registry.redhat.io/container-native-virtualization/virtio-win-rhel9@sha256:7e06e1f52a434d4602657c920144504fbaed955d0998535bdf345716355ce83a
                     - name: autounattend
                       sysprep:
                         configMap:

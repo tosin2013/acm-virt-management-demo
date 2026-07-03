@@ -79,7 +79,7 @@ spec:
 EOF
 ----
 
-* Create a Subscription that deploys VM workloads from the repository:
+* Create a Subscription that deploys VM workloads from the repository. The Subscription must be in the same namespace as the Placement it references:
 +
 [source,role="execute"]
 ----
@@ -88,7 +88,7 @@ apiVersion: apps.open-cluster-management.io/v1
 kind: Subscription
 metadata:
   name: vm-workload-subscription
-  namespace: vm-demo-app
+  namespace: open-cluster-management-policies
   annotations:
     apps.open-cluster-management.io/git-path: policies/
     apps.open-cluster-management.io/git-branch: main
@@ -105,7 +105,7 @@ EOF
 +
 [source,role="execute"]
 ----
-oc get subscription vm-workload-subscription -n vm-demo-app -o yaml | grep -A5 status
+oc get subscription vm-workload-subscription -n open-cluster-management-policies -o yaml | grep -A5 status
 ----
 
 == Part 3 -- Proving Non-Admin Deployment Works
