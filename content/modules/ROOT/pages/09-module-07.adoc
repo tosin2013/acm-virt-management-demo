@@ -183,7 +183,7 @@ _This is the most visual and compelling part of the module. By logging into the 
 * Now open a new **incognito/private browser window** and navigate to the ACM console:
 +
 ----
-{hub_console_url}
+{openshift_console_url}
 ----
 +
 Log in as:
