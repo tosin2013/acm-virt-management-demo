@@ -103,6 +103,10 @@ ocp4_workload_authentication_htpasswd_remove_kubeadmin: false
 
 # --- RHACM ---
 ocp4_workload_rhacm_channel: release-2.16
+# OpenShift Virtualization is installed on the hub via the MCH
+# cnv-mtv-integrations toggle (enabled by deploy.sh Step 2b).
+# This provides the Fleet Virtualization console plugin.
+# The hub does not run VM workloads; VMs run on student clusters.
 
 # --- OpenShift GitOps ---
 ocp4_workload_openshift_gitops_channel: latest

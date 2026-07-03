@@ -194,9 +194,9 @@ if ! oc get deploy openshift-gitops-applicationset-controller -n openshift-gitop
 fi
 FIXUP_EOF
 
-  # Install application-manager addon on each student cluster
+  # Per-student-cluster addons and labels
   for i in $(seq 1 "$NUM_STUDENTS"); do
-    echo "   Installing application-manager addon on student-${i}..."
+    echo "   Configuring addons and labels on student-${i}..."
     sshpass -p "$HUB_BASTION_PASS" ssh -o StrictHostKeyChecking=no "student@${HUB_BASTION_HOST}" bash -s <<ADDON_EOF
 oc apply -f - <<'EOF'
 apiVersion: addon.open-cluster-management.io/v1alpha1
@@ -206,9 +206,28 @@ metadata:
   namespace: student-${i}
 spec:
   installNamespace: open-cluster-management-agent-addon
+---
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: search-collector
+  namespace: student-${i}
+spec:
+  installNamespace: open-cluster-management-agent-addon
 EOF
+oc label managedcluster student-${i} acm/cnv-operator-install="true" --overwrite
 ADDON_EOF
   done
+
+  # One-time hub-level Fleet Virtualization enablement
+  echo "   Enabling Fleet Virtualization on hub..."
+  sshpass -p "$HUB_BASTION_PASS" ssh -o StrictHostKeyChecking=no "student@${HUB_BASTION_HOST}" bash -s <<'FLEET_VIRT_EOF'
+oc annotate search search-v2-operator -n open-cluster-management \
+  virtual-machine-preview='true' --overwrite
+oc patch multiclusterhub multiclusterhub -n open-cluster-management \
+  --type=merge -p '{"spec":{"overrides":{"components":[{"name":"cnv-mtv-integrations","enabled":true}]}}}'
+FLEET_VIRT_EOF
+
   echo "   Post-import fixups complete."
 else
   echo "   WARNING: Could not determine hub bastion — skipping post-import fixups."

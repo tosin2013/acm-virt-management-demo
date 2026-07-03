@@ -59,31 +59,66 @@ image::acm-topology-graph.png[ACM Topology graph showing VM components across cl
 
 * Toggle between *Graph view* and *List view* to show different perspectives on the same deployment
 
-== Part 2 -- Remote Diagnostics via Topology
+== Part 2 -- Fleet Virtualization Management
 
 === Know
 
-_The topology view is the "proof screenshot" for the customer -- it visually confirms that the entire GitOps pipeline works end-to-end, from Git commit to running VM across multiple clusters._
+_Beyond the topology graph, RHACM 2.16 introduces a dedicated *Fleet Virtualization* perspective that provides a centralized console for managing VMs across every managed cluster -- without opening individual cluster consoles._
 
-A critical capability to highlight: *remote log retrieval*. Level-1 operators can inspect VM pod logs and diagnose issues (CrashLoopBackOff, boot failures, network misconfigurations) directly from the topology view -- without needing kubeconfig access to the managed cluster. This reinforces the zero-trust operational model from Module 6.
+**Business Challenge:**
+Operators managing VMs across dozens of clusters need a single pane of glass to see inventory, health, and perform lifecycle actions. Logging into each cluster individually does not scale.
+
+**Technical Solution:**
+The Fleet Virtualization perspective combines two data channels:
+
+* *Inventory* -- the `search-collector` agent on each managed cluster streams VirtualMachine metadata to the hub's search index, enabling instant fleet-wide listing
+* *Lifecycle controls* -- start, stop, restart, pause, and snapshot actions are proxied through `cluster-proxy` to the managed cluster's KubeVirt API, authenticated via `ManagedServiceAccount` tokens
+
+**Business Value:**
+
+* *Single pane of glass* -- view and manage every VM across the fleet from one console
+* *Zero-trust operations* -- operators need hub access only; no kubeconfig or SSH to managed clusters
+* *Instant fleet inventory* -- filter, sort, and search VMs by name, cluster, namespace, or node
 
 === Show
 
-* In the topology graph, locate a VirtualMachine node and click on its virt-launcher pod
+* In the Hub console, click the perspective switcher (top-left) and select *Fleet virtualization*
 
-* Click *View Logs* on the VM's virt-launcher pod to retrieve remote logs:
+* The *VirtualMachines* page lists all VMs across managed clusters. You should see both `fedora-web` and `win2019-install` running on the student cluster.
 
-image::acm-topology-vm-logs.png[Remote log retrieval from VM topology view]
+image::fleet-virt-vm-list.png[Fleet Virtualization showing VMs across managed clusters]
+
+* Click the *3-dot menu* next to a VM to see available lifecycle actions:
+** Start / Stop / Restart / Pause / Unpause
+** Take a snapshot
+** Edit YAML
+
+* Use the *Launch links* button to jump directly to:
+** VM details page on the managed cluster console
+** VM console (VNC)
+** Observability metrics in Grafana
+
+* The *Cluster status* section at the bottom shows:
+** Total clusters running OpenShift Virtualization
+** Total VMs across the fleet
+** Cluster utilization and load balance scores
 
 [NOTE]
 ====
-Emphasize to the customer: "You just retrieved logs from a VM running on a remote cluster without having any kubeconfig or direct CLI access to that cluster. The ACM Hub proxied the request securely."
+Emphasize to the customer: "You just started, stopped, or inspected a VM running on a remote cluster -- without having any kubeconfig, SSH access, or direct CLI access to that cluster. The ACM Hub proxied everything securely through the cluster-proxy framework."
+====
+
+[TIP]
+====
+You can also search for VMs using the ACM *Search* page (in the Fleet Management perspective). Search for `kind:VirtualMachine` to see all VMs across clusters with rich metadata filtering.
 ====
 
 == Key Takeaways
 
 * Application Topology provides visual validation of multicluster GitOps deployments
 * The view works identically for container and VM-based workloads
-* Remote log retrieval enables zero-trust diagnostics without per-cluster credentials
+* The *Fleet Virtualization* perspective provides centralized VM lifecycle management across all clusters
+* Remote VM operations (start/stop/restart/snapshot) work through `cluster-proxy` without per-cluster credentials
+* The `search-collector` addon streams VM metadata for instant fleet-wide inventory
 * ApplicationSets with `clusterDecisionResource` dynamically target clusters via ACM Placement
 * The topology graph spans Hub and managed clusters in a single interactive view
