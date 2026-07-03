@@ -47,21 +47,82 @@ cat rbac/cluster-permission-vm-edit.yaml
 * Note the key elements:
 ** `clusterRole.rules` defines exactly which kubevirt.io operations are permitted
 ** `clusterRoleBinding` creates a ClusterRoleBinding on the managed cluster for the `vm-operators` group
-** The ClusterRole is auto-generated and distributed via ManifestWork synchronization
 ** The subject is a Group (`vm-operators`) -- not individual users, so team membership changes propagate automatically
 
-== Part 2 -- Applying ClusterPermission
+== Part 2 -- Create a Scoped VM Operator User
 
 === Know
 
-_ClusterPermission resources are namespaced on the Hub -- the namespace name matches the managed cluster name. This is how ACM knows which managed cluster to target._
+_To demonstrate the console experience, we create a real user (`vm-operator`) who belongs to the `vm-operators` group. This user gets only the access they need: view managed clusters in ACM and manage VMs on those clusters. They cannot see nodes, secrets, or cluster-level configuration._
 
-When the ClusterPermission is created, the ACM ClusterPermission controller:
+=== Show
 
-1. Validates the requested roles exist on the target cluster
-2. Generates the Role and RoleBinding manifests
-3. Creates a ManifestWork resource to deploy them
-4. Continuously monitors for drift and re-applies if needed
+* Create the `vm-operators` group with a `vm-operator` user:
++
+[source,role="execute"]
+----
+cat <<EOF | oc apply -f -
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: vm-operators
+users:
+  - vm-operator
+EOF
+----
+
+* Add the `vm-operator` user to HTPasswd authentication so they can log into the console (password: `redhat123`):
++
+[source,role="execute"]
+----
+HTPASSWD=$(oc get secret htpasswd -n openshift-config -o jsonpath='{.data.htpasswd}' | base64 -d)
+NEW_ENTRY=$(htpasswd -nbB vm-operator redhat123)
+UPDATED="${HTPASSWD}"$'\n'"${NEW_ENTRY}"
+echo "$UPDATED" | oc create secret generic htpasswd \
+  --from-file=htpasswd=/dev/stdin -n openshift-config \
+  --dry-run=client -o yaml | oc apply -f -
+----
+
+* Grant the user view access to the managed cluster and the virt-clusters ManagedClusterSet in ACM:
++
+[source,role="execute",subs="attributes+"]
+----
+oc adm policy add-cluster-role-to-user view vm-operator
+
+cat <<EOF | oc apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vm-operator-managed-cluster-view
+subjects:
+  - kind: User
+    name: vm-operator
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: open-cluster-management:view:{student_cluster_name}
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vm-operator-clusterset-view
+subjects:
+  - kind: User
+    name: vm-operator
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: open-cluster-management:managedclusterset:view:virt-clusters
+  apiGroup: rbac.authorization.k8s.io
+EOF
+----
+
+== Part 3 -- Apply ClusterPermission and Distribute RBAC
+
+=== Know
+
+_ClusterPermission resources are namespaced on the Hub -- the namespace name matches the managed cluster name. When the ClusterPermission is created, ACM generates ManifestWork to distribute the Role and RoleBinding to the target cluster. The permissions are continuously monitored for drift and re-applied if needed._
 
 === Show
 
@@ -72,55 +133,15 @@ When the ClusterPermission is created, the ACM ClusterPermission controller:
 oc apply -f rbac/cluster-permission-vm-edit.yaml
 ----
 
-* Verify the ClusterPermission was created:
+* Verify the ClusterPermission and ManifestWork were created:
 +
 [source,role="execute",subs="attributes+"]
 ----
 oc get clusterpermissions -n {student_cluster_name}
-----
-
-* Check the ManifestWork was created to distribute the RBAC:
-+
-[source,role="execute",subs="attributes+"]
-----
 oc get manifestwork -n {student_cluster_name} | grep vm-editor
 ----
 
-* SSH to the managed cluster bastion to verify the ClusterRole and ClusterRoleBinding were created:
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
-
-* Verify the distributed RBAC resources:
-+
-[source,role="execute"]
-----
-oc get clusterrole vm-editor-permission
-oc get clusterrolebinding vm-editor-permission -o yaml | grep -A3 subjects
-----
-
-* Return to the Hub terminal:
-+
-[source,role="execute"]
-----
-exit
-----
-
-== Part 3 -- Demonstrating Scoped VM Access
-
-=== Know
-
-_The proof is in the access. A user in the `vm-operators` group can now manage VMs on the managed cluster -- and is denied access to everything else._
-
-This is the exact capability enterprises need: their VM operations team can start, stop, restart, and console into VMs without seeing the underlying node configuration, network topology, or storage infrastructure. These access checks must run on the managed cluster where the ClusterPermission distributed the RBAC.
-
-=== Show
-
-* ClusterPermission distributes RBAC to the managed cluster, so the access checks must run there. SSH to the student cluster bastion:
+* SSH to the managed cluster to confirm the RBAC was distributed:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -136,73 +157,7 @@ Password: `{student_1_bastion_ssh_password}`
 oc get clusterrole vm-editor-permission -o jsonpath='{range .rules[*]}{.apiGroups[*]}{"\t"}{.resources[*]}{"\t"}{.verbs[*]}{"\n"}{end}'
 ----
 +
-You should see rules granting `get`, `list`, `watch`, `update`, `patch` for `kubevirt.io` resources (virtualmachines, virtualmachineinstances) and `start`, `stop`, `restart`, `console` subresources.
-
-* As a vm-operators group member, demonstrate permitted actions using a `SubjectAccessReview`:
-+
-[source,role="execute"]
-----
-oc create -f - -o jsonpath='{.status.allowed}' <<'EOF' && echo
-apiVersion: authorization.k8s.io/v1
-kind: SubjectAccessReview
-spec:
-  user: vm-user
-  groups: ["vm-operators"]
-  resourceAttributes:
-    verb: get
-    group: kubevirt.io
-    resource: virtualmachines
-    namespace: vm-production
-EOF
-----
-+
-Expected output: `true`
-
-+
-[source,role="execute"]
-----
-oc create -f - -o jsonpath='{.status.allowed}' <<'EOF' && echo
-apiVersion: authorization.k8s.io/v1
-kind: SubjectAccessReview
-spec:
-  user: vm-user
-  groups: ["vm-operators"]
-  resourceAttributes:
-    verb: update
-    group: subresources.kubevirt.io
-    resource: virtualmachines
-    subresource: start
-    namespace: vm-production
-EOF
-----
-+
-Expected output: `true`
-
-* Now demonstrate denied actions -- the same user cannot access cluster-level resources:
-+
-[source,role="execute"]
-----
-oc auth can-i get nodes --as-group=vm-operators --as=vm-user
-----
-+
-Expected output: `no`
-
-+
-[source,role="execute"]
-----
-oc auth can-i get secrets -n openshift-config --as-group=vm-operators --as=vm-user
-----
-+
-Expected output: `no`
-
-* Show that the user has no access to non-VM resources in any namespace:
-+
-[source,role="execute"]
-----
-oc auth can-i delete namespaces --as-group=vm-operators --as=vm-user
-----
-+
-Expected output: `no`
+You should see rules granting `get`, `list`, `watch`, `update`, `patch` for `kubevirt.io` resources and `start`, `stop`, `restart`, `console` subresources.
 
 * Return to the Hub terminal:
 +
@@ -211,15 +166,79 @@ Expected output: `no`
 exit
 ----
 
-[NOTE]
+== Part 4 -- The Console Experience: Admin vs. VM Operator
+
+=== Know
+
+_This is the most visual and compelling part of the module. By logging into the ACM console as the `vm-operator` user, you demonstrate exactly what a scoped user sees -- and more importantly, what they do NOT see. This is the "before and after" that resonates with customers._
+
+=== Show
+
+* First, note what you see as the **admin** user in the ACM console:
+** Full *Infrastructure* menu with Clusters, Automation, Bare metal assets
+** *Governance* with all policies
+** *Applications* with all subscriptions and application sets
+** Fleet Virtualization showing all clusters and all VMs
+
+* Now open a new **incognito/private browser window** and navigate to the ACM console:
++
+----
+{hub_console_url}
+----
++
+Log in as:
++
+** Username: `vm-operator`
+** Password: `redhat123`
+
+* Observe the **restricted view** as the `vm-operator` user:
+** The *Fleet Virtualization* perspective shows only the clusters and VMs in the `virt-clusters` ManagedClusterSet
+** The user can see VM status, access the VM console, and view VM metrics
+** The user **cannot** see *Governance* policies, *Infrastructure* node details, or cluster secrets
+** The user **cannot** create or delete managed clusters
+
+image::module-07-vm-operator-console.png[VM operator's restricted console view showing only Fleet Virtualization access]
+
+[TIP]
 ====
-**Point out to the customer:** "This operator can start, stop, restart, and console into any VM on this managed cluster. They cannot see a single node, secret, or cluster-level resource outside their granted permissions. And this permission is centrally managed from the Hub -- if you revoke the ClusterPermission, the RBAC disappears from all managed clusters within seconds."
+Open the admin console and the vm-operator console side by side to show the contrast. The admin sees the full RHACM feature set; the vm-operator sees only what they need -- Fleet Virtualization for their assigned clusters.
+====
+
+* Back in the **Hub terminal**, verify the access boundaries with CLI checks:
++
+[source,role="execute"]
+----
+oc auth can-i get nodes --as-group=vm-operators --as=vm-operator
+----
++
+Expected: `no`
+
++
+[source,role="execute"]
+----
+oc auth can-i get secrets -n openshift-config --as-group=vm-operators --as=vm-operator
+----
++
+Expected: `no`
+
++
+[source,role="execute"]
+----
+oc auth can-i delete managedclusters --as-group=vm-operators --as=vm-operator
+----
++
+Expected: `no`
+
+[IMPORTANT]
+====
+**Key message for the customer:** "This operator can view and manage VMs across the fleet from the console. They can start, stop, restart, and console into any VM on their assigned clusters. But they cannot see a single node, secret, or cluster-level resource. And this permission is centrally managed from the Hub -- if you revoke the ClusterPermission, the RBAC disappears from all managed clusters within seconds. No more manual Role/RoleBinding management on 50 clusters."
 ====
 
 == Key Takeaways
 
 * ClusterPermission API replaces manual Role/RoleBinding management at scale
 * Permissions are continuously synchronized via ManifestWork -- drift is automatically corrected
-* VM operators get exactly the access they need -- kubevirt.io operations, nothing else
-* Revoking access on the Hub propagates to all managed clusters automatically
+* VM operators get a full console experience scoped to exactly their responsibilities
+* The admin vs. vm-operator console comparison is the most powerful visual in the module
 * Group-based subjects mean team membership changes propagate without manifest updates
+* Revoking access on the Hub propagates to all managed clusters automatically
