@@ -7,6 +7,7 @@ on:
     paths-ignore:
       - "README.md"
       - ".gitignore"
+      - "blogs/**"
 
 permissions:
   pages: write
@@ -33,7 +34,7 @@ jobs:
       - name: antora generate
         run: antora generate default-site.yml --stacktrace
       - name: upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: www
   deploy:
@@ -45,4 +46,4 @@ jobs:
     steps:
       - name: deploy github pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
