@@ -200,7 +200,7 @@ tail -f ~/Development/agnosticd-v2-output/acmvirt-hub/acmvirt-hub.log
 
 | Component | Purpose |
 |-----------|---------|
-| RHACM 2.16 | Multicluster governance (VM right-sizing, cross-cluster live migration) |
+| RHACM 2.17 | Multicluster governance (VM right-sizing, fine-grained RBAC, cross-cluster live migration) |
 | RHACM Observability | Centralized Grafana + Thanos with auto-provisioned S3 bucket |
 | OpenShift GitOps | ArgoCD for declarative VM deployment (ApplicationSet controller enabled) |
 | OADP | Velero-based VM backup |

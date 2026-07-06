@@ -12,9 +12,9 @@ A Red Hat Showroom demo covering multicluster governance and virtualization life
 2. **Application Topology Views** -- Visual dependency graphs and remote log retrieval
 3. **VM Policies and Governance** -- Declarative VM governance via ACM ConfigurationPolicies
 4. **Fleet Observability** -- Centralized Grafana dashboards for VM metrics across clusters
-5. **VM Right-Sizing Recommendations** -- RHACM 2.16 right-sizing dashboards with observe-resize-verify workflow
+5. **VM Right-Sizing Recommendations** -- RHACM right-sizing dashboards with observe-resize-verify workflow
 6. **Deploy Without Cluster-Admin** -- GitOps workflows using `subscription-admin`
-7. **Fine-Grained ACM Permissions** -- ClusterPermission API for scoped kubevirt.io roles
+7. **Fine-Grained ACM Permissions** -- MulticlusterRoleAssignment API for scoped kubevirt.io roles
 8. **Eradicate Cluster Destruction** -- Custom RBAC preventing managed cluster deletion
 
 ## Structure
@@ -22,7 +22,7 @@ A Red Hat Showroom demo covering multicluster governance and virtualization life
 ```
 content/                    Antora/AsciiDoc Showroom lab content
 policies/                   ACM policy manifests (GitOps-ready)
-rbac/                       RBAC manifests (ClusterRole, ClusterPermission)
+rbac/                       RBAC manifests (ClusterRole, MulticlusterRoleAssignment, Placement)
 right-sizing/               ACM right-sizing policies and Grafana dashboard ConfigMaps
 components/httpd-fileserver/ In-cluster HTTP file server for ISO hosting (OAuth-secured UI)
 ansible/roles/              AgnosticD workload roles for automated deployment

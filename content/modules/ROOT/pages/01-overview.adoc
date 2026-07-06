@@ -56,7 +56,7 @@ This demo walks through eight capabilities that solve each of these problems:
 | GitOps workflows with `subscription-admin` -- deploy everywhere, admin nowhere
 
 | Fine-Grained ACM Permissions
-| Scoped VM start/stop/restart access via ClusterPermission API
+| Scoped VM start/stop/restart access via MulticlusterRoleAssignment API
 
 | Eradicate Cluster Destruction
 | Custom RBAC that cryptographically prevents cluster deletion

@@ -1,0 +1,26 @@
+apiVersion: rbac.open-cluster-management.io/v1beta1
+kind: MulticlusterRoleAssignment
+metadata:
+  name: vm-operators-assignment
+  namespace: virt-clusters
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+spec:
+  subject:
+    kind: Group
+    name: vm-operators
+  roleAssignments:
+    - name: vm-edit-access
+      clusterRole: kubevirt.io:edit
+      clusterSelection:
+        type: placements
+        placements:
+          - name: virt-rbac-placement
+            namespace: virt-clusters
+    - name: vm-extended-admin-access
+      clusterRole: acm-vm-extended:admin
+      clusterSelection:
+        type: placements
+        placements:
+          - name: virt-rbac-placement
+            namespace: virt-clusters

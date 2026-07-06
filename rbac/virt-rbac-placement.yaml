@@ -1,0 +1,18 @@
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: virt-rbac-placement
+  namespace: virt-clusters
+  labels:
+    app.kubernetes.io/part-of: acm-virt-management-demo
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            virtualization-enabled: "true"
+  tolerations:
+    - key: cluster.open-cluster-management.io/unreachable
+      operator: Equal
+    - key: cluster.open-cluster-management.io/unavailable
+      operator: Equal

@@ -23,13 +23,13 @@ This demo proved eight capabilities that together deliver a unified, zero-trust 
 | A single Grafana dashboard providing fleet-wide, per-cluster, and per-VM metrics -- eliminating per-cluster login for diagnostics
 
 | *VM Right-Sizing Recommendations*
-| Official RHACM 2.16 right-sizing dashboards showing over- and under-provisioned VMs, with a live resize-and-verify workflow
+| Official RHACM right-sizing dashboards showing over- and under-provisioned VMs, with a live resize-and-verify workflow
 
 | *Deploy Without Cluster-Admin*
 | GitOps deployment via `subscription-admin` -- deploying VM governance across the fleet while being denied destructive actions
 
 | *Fine-Grained ACM Permissions*
-| ClusterPermission API distributing scoped `kubevirt.io` roles to specific namespaces on managed clusters -- centrally managed from the Hub
+| MulticlusterRoleAssignment API distributing scoped `kubevirt.io` roles to managed clusters via Placement -- centrally managed from the Hub
 
 | *Eradicate Cluster Destruction*
 | Custom ClusterRole with `delete` verb omitted for all cluster lifecycle APIs -- the Kubernetes API server cryptographically denies destruction attempts
@@ -47,7 +47,7 @@ This demo proved eight capabilities that together deliver a unified, zero-trust 
 
 1. **Proof of Concept** -- deploy this demo in the customer's environment with their actual managed clusters and VM workloads
 2. **Policy Customization** -- adapt the right-sizing thresholds and backup schedules to the customer's SLAs
-3. **RBAC Design Workshop** -- map the customer's team structure to ClusterPermission and non-destructive role configurations
+3. **RBAC Design Workshop** -- map the customer's team structure to MulticlusterRoleAssignment and non-destructive role configurations
 4. **Migration Planning** -- use Migration Toolkit for Virtualization (MTV) to migrate existing VMware VMs to OpenShift Virtualization under ACM governance
 5. **Production Rollout** -- progressive rollout starting with non-production clusters, expanding to production with validated policies
 
@@ -57,8 +57,9 @@ This demo proved eight capabilities that together deliver a unified, zero-trust 
 * https://docs.openshift.com/container-platform/latest/virt/about_virt/about-virt.html[OpenShift Virtualization Documentation]
 * https://open-cluster-management.io/[Open Cluster Management Project]
 * https://github.com/open-cluster-management-io/policy-collection[ACM Policy Collection]
-* https://github.com/open-cluster-management-io/cluster-permission[ClusterPermission Add-on]
+* https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17/html-single/secure_clusters/index#fine-grain-intro[Fine-Grained RBAC for Virtual Machines]
 * https://github.com/stolostron/right-sizing[Right-Sizing Integration]
+* https://developers.redhat.com/articles/2026/06/22/right-sizing-recommendations-mcoa-and-perses-dashboards[Right-Sizing with MCOA and Perses Dashboards (RHACM 2.17)]
 * https://github.com/tosin2013/acm-virt-management-demo[This Demo Repository]
 
 == Feedback

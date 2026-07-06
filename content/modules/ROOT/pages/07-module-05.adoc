@@ -377,3 +377,8 @@ oc patch cm rs-virt-config -n open-cluster-management-observability --type=merge
 * The complete right-sizing loop: observe overestimation → resize → verify the workload is healthy → commit to Git
 * Recommendation thresholds are configurable via `rs-virt-config` to match organizational risk tolerance
 * This is the Kubernetes-native replacement for VMware DRS -- transparent, open-standards-based, and fleet-scale
+
+[TIP]
+====
+**What's next for right-sizing:** RHACM 2.17 introduces a developer preview of right-sizing powered by Perses dashboards delivered through the multicluster observability add-on (MCOA), replacing Grafana with a CNCF-native visualization layer. See https://developers.redhat.com/articles/2026/06/22/right-sizing-recommendations-mcoa-and-perses-dashboards[Right-sizing recommendations with MCOA and Perses dashboards] for details on the architectural evolution.
+====

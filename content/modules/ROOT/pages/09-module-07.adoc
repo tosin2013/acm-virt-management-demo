@@ -5,55 +5,69 @@
 
 toc::[]
 
-== Part 1 -- Beyond All-or-Nothing RBAC
+== Part 1 -- Enable Fine-Grained RBAC
 
 === Know
 
-_Historically, managing a multicluster fleet with RHACM required broad administrative roles that exposed the entire infrastructure to potential mismanagement. The ClusterPermission API changes this fundamentally by enabling surgical, namespace-scoped permission distribution to managed clusters._
+_RHACM 2.17 introduces a dedicated fine-grained RBAC subsystem for virtualization. Before creating role assignments, the `fine-grained-rbac` component must be enabled in the MultiClusterHub resource. This unlocks the MulticlusterRoleAssignment API and the console-based role assignment UI._
 
-**Business Challenge:**
-A VM operations team needs to start, stop, restart, and console into VMs on managed clusters. Today, this requires either:
-
-* *cluster-admin on each managed cluster* -- too broad, exposes the entire cluster
-* *Manual Role/RoleBinding creation on each cluster* -- does not scale, drifts over time
-
-Neither option is acceptable for organizations with dozens of clusters and hundreds of VMs.
-
-**Technical Solution:**
-The `ClusterPermission` API (`clusterpermissions.rbac.open-cluster-management.io`) allows the Hub to:
-
-1. Define a custom ClusterRole with exact kubevirt.io permissions
-2. Automatically distribute the ClusterRole and ClusterRoleBinding to managed clusters
-3. Maintain the lifecycle of distributed RBAC via ManifestWork synchronization
-
-**Business Value:**
-
-* *Surgical precision* -- grant exactly kubevirt.io operations, nothing else
-* *Lifecycle management* -- permissions are continuously synchronized, not "set and forget"
-* *Centralized audit* -- all permission grants are visible on the Hub
-* *Group-based targeting* -- bind to a group, not individual users, for scalable team management
+**What changed from 2.16:** The `ClusterPermission` API (`v1alpha1`) distributed custom inline rules via ManifestWork. In 2.17, the `MulticlusterRoleAssignment` API (`v1beta1`) replaces this for virtualization RBAC. MRA references existing ClusterRoles by name and uses Placement resources for cluster targeting -- a declarative, scalable model that integrates with the ACM console.
 
 === Show
 
 NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
 
-* Review the ClusterPermission manifest before applying:
+* Enable the fine-grained RBAC component in the MultiClusterHub:
 +
 [source,role="execute"]
 ----
-cat rbac/cluster-permission-vm-edit.yaml
+oc patch mch multiclusterhub -n open-cluster-management --type=json \
+  -p='[{"op": "add", "path": "/spec/overrides/components/-", "value": {"name": "fine-grained-rbac", "enabled": true}}]'
 ----
 
-* Note the key elements:
-** `clusterRole.rules` defines exactly which kubevirt.io operations are permitted
-** `clusterRoleBinding` creates a ClusterRoleBinding on the managed cluster for the `vm-operators` group
-** The subject is a Group (`vm-operators`) -- not individual users, so team membership changes propagate automatically
+* Verify the component is enabled:
++
+[source,role="execute"]
+----
+oc get mch multiclusterhub -n open-cluster-management -o jsonpath='{.spec.overrides.components}' | python3 -m json.tool
+----
++
+You should see `"name": "fine-grained-rbac", "enabled": true` in the output.
 
-== Part 2 -- Create a Scoped VM Operator User
+== Part 2 -- Understand the New RBAC Model
 
 === Know
 
-_To demonstrate the console experience, we create a real user (`vm-operator`) who belongs to the `vm-operators` group. This user gets only the access they need: view managed clusters in ACM and manage VMs on those clusters. They cannot see nodes, secrets, or cluster-level configuration._
+_RHACM 2.17 provides specialized roles for fleet virtualization that extend the standard `kubevirt.io` roles installed by the OpenShift Virtualization operator. Permissions are constructed using a combination of hub-level roles (for console access) and spoke-level roles (for VM operations)._
+
+**Hub-level roles** (applied as ClusterRoleBindings on the Hub):
+
+* `acm-vm-fleet:view` -- prerequisite for accessing the fleet virtualization console
+* `acm-vm-fleet:admin` -- prerequisite for cross-cluster live migration tasks
+
+**Spoke-level roles** (distributed to managed clusters via MRA):
+
+* `kubevirt.io:view` / `kubevirt.io:edit` / `kubevirt.io:admin` -- standard OpenShift Virtualization roles
+* `acm-vm-extended:view` -- extends `kubevirt.io` roles with console visibility for configurations, status, and troubleshooting
+* `acm-vm-extended:admin` -- extends `kubevirt.io` roles with administrative troubleshooting and configuration in the console
+* `acm-vm-cluster-migration:view` -- enables cross-cluster live migration readiness checks
+
+**The MulticlusterRoleAssignment (MRA) API:**
+
+The MRA custom resource (`rbac.open-cluster-management.io/v1beta1`) provides a declarative method for distributing RBAC across a multicluster environment. Instead of creating one ClusterPermission per managed cluster namespace, you create a single MRA on the Hub that:
+
+1. Specifies a **subject** (User or Group)
+2. References one or more **existing ClusterRoles** by name
+3. Uses a **Placement** resource to select target clusters
+4. Optionally scopes access to specific **namespaces** on those clusters
+
+The system creates the corresponding RoleBinding or ClusterRoleBinding on each selected managed cluster.
+
+== Part 3 -- Create a Scoped VM Operator User
+
+=== Know
+
+_To demonstrate the console experience, we create a real user (`vm-operator`) who belongs to the `vm-operators` group. This user gets only the access they need: view the fleet virtualization console on the Hub and manage VMs on managed clusters. They cannot see nodes, secrets, or cluster-level configuration._
 
 === Show
 
@@ -83,7 +97,19 @@ echo "$UPDATED" | oc create secret generic htpasswd \
   --dry-run=client -o yaml | oc apply -f -
 ----
 
-* Grant the user view access to the managed cluster and the virt-clusters ManagedClusterSet in ACM:
+== Part 4 -- Apply Hub-Level and Spoke-Level RBAC
+
+=== Know
+
+_The fine-grained RBAC model requires permissions at two levels: the Hub cluster (for console access) and the managed clusters (for VM operations). We apply both in this step._
+
+**Hub-level:** A ClusterRoleBinding on the Hub granting `acm-vm-fleet:view` to the `vm-operators` group. This is a prerequisite for the group to access the fleet virtualization console.
+
+**Spoke-level:** A MulticlusterRoleAssignment that distributes `kubevirt.io:edit` and `acm-vm-extended:admin` to managed clusters selected by a Placement resource.
+
+=== Show
+
+* Grant the `vm-operators` group view access to the managed cluster and ManagedClusterSet:
 +
 [source,role="execute",subs="attributes+"]
 ----
@@ -118,55 +144,83 @@ roleRef:
 EOF
 ----
 
-== Part 3 -- Apply ClusterPermission and Distribute RBAC
+* Apply the Hub-level fleet view role binding:
++
+[source,role="execute"]
+----
+oc apply -f rbac/hub-vm-fleet-view-binding.yaml
+----
+
+* Review the Placement that selects virtualization-enabled clusters:
++
+[source,role="execute"]
+----
+cat rbac/virt-rbac-placement.yaml
+----
+
+* Apply the Placement:
++
+[source,role="execute"]
+----
+oc apply -f rbac/virt-rbac-placement.yaml
+----
+
+* Review the MulticlusterRoleAssignment before applying:
++
+[source,role="execute"]
+----
+cat rbac/multicluster-role-assignment-vm-edit.yaml
+----
++
+Note the key elements:
+** `spec.subject` targets the `vm-operators` Group -- not individual users
+** `roleAssignments` references `kubevirt.io:edit` and `acm-vm-extended:admin` by name (existing ClusterRoles on managed clusters)
+** `clusterSelection` uses the Placement resource to dynamically select target clusters
+** No inline rule definitions -- the MRA references roles that are already installed by the operators
+
+* Apply the MulticlusterRoleAssignment:
++
+[source,role="execute"]
+----
+oc apply -f rbac/multicluster-role-assignment-vm-edit.yaml
+----
+
+* Verify the MRA was created:
++
+[source,role="execute"]
+----
+oc get multiclusterroleassignments -n virt-clusters
+----
+
+== Part 5 -- Console-Based Role Assignment (Alternative)
 
 === Know
 
-_ClusterPermission resources are namespaced on the Hub -- the namespace name matches the managed cluster name. When the ClusterPermission is created, ACM generates ManifestWork to distribute the Role and RoleBinding to the target cluster. The permissions are continuously monitored for drift and re-applied if needed._
+_RHACM 2.17 also provides a console UI for creating role assignments without writing YAML. This is useful for ad-hoc assignments or for administrators who prefer a graphical workflow._
 
 === Show
 
-* Apply the ClusterPermission to target `{student_cluster_name}`:
-+
-[source,role="execute"]
-----
-oc apply -f rbac/cluster-permission-vm-edit.yaml
-----
+* In the ACM console, navigate to **Infrastructure** → **Virtual Machines** → **Settings** → **Role Assignments**
 
-* Verify the ClusterPermission and ManifestWork were created:
-+
-[source,role="execute",subs="attributes+"]
-----
-oc get clusterpermissions -n {student_cluster_name}
-oc get manifestwork -n {student_cluster_name} | grep vm-editor
-----
+* From the Role Assignments tab, you can:
+** View all existing role assignments across the fleet
+** Create new assignments by selecting an identity (user or group), a role, and target clusters
+** Modify or delete existing assignments
 
-* SSH to the managed cluster to confirm the RBAC was distributed:
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
+* To create an assignment via the console:
+. Click **Create role assignment**
+. Select the identity type (User or Group) and enter the name
+. Choose the role (e.g., `kubevirt.io:edit`)
+. Select the target clusters or cluster sets
+. Optionally scope to specific namespaces
+. Click **Create**
 
-* Verify the ClusterRole grants the expected kubevirt.io permissions:
-+
-[source,role="execute"]
-----
-oc get clusterrole vm-editor-permission -o jsonpath='{range .rules[*]}{.apiGroups[*]}{"\t"}{.resources[*]}{"\t"}{.verbs[*]}{"\n"}{end}'
-----
-+
-You should see rules granting `get`, `list`, `watch`, `update`, `patch` for `kubevirt.io` resources and `start`, `stop`, `restart`, `console` subresources.
+[TIP]
+====
+The console UI creates the same `MulticlusterRoleAssignment` resources under the hood. You can verify by running `oc get multiclusterroleassignments -A` after creating an assignment in the console.
+====
 
-* Return to the Hub terminal:
-+
-[source,role="execute"]
-----
-exit
-----
-
-== Part 4 -- The Console Experience: Admin vs. VM Operator
+== Part 6 -- The Console Experience: Admin vs. VM Operator
 
 === Know
 
@@ -203,7 +257,7 @@ image::module-07-vm-operator-console.png[VM operator's restricted console view s
 
 image::module-07-vm-operator-actions.png[VM operator can Stop Restart Reset and Console into VMs from the Actions menu]
 
-The `vm-operator` user can **Stop**, **Restart**, **Reset**, access the **Console**, and view VM metrics -- exactly the operations defined in the ClusterPermission. They cannot Clone, Delete, or perform Migration actions that require broader permissions.
+The `vm-operator` user can **Stop**, **Restart**, **Reset**, access the **Console**, and view VM metrics -- exactly the operations granted by the `kubevirt.io:edit` role distributed via the MulticlusterRoleAssignment. They cannot Clone, Delete, or perform Migration actions that require broader permissions.
 
 [TIP]
 ====
@@ -237,13 +291,16 @@ Expected: `no`
 
 [IMPORTANT]
 ====
-**Key message for the customer:** "This operator can view and manage VMs across the fleet from the console. They can start, stop, restart, and console into any VM on their assigned clusters. But they cannot see a single node, secret, or cluster-level resource. And this permission is centrally managed from the Hub -- if you revoke the ClusterPermission, the RBAC disappears from all managed clusters within seconds. No more manual Role/RoleBinding management on 50 clusters."
+**Key message for the customer:** "This operator can view and manage VMs across the fleet from the console. They can start, stop, restart, and console into any VM on their assigned clusters. But they cannot see a single node, secret, or cluster-level resource. And this permission is centrally managed from the Hub -- if you delete the MulticlusterRoleAssignment, the RBAC disappears from all managed clusters. No more manual Role/RoleBinding management on 50 clusters."
 ====
 
 == Key Takeaways
 
-* ClusterPermission API replaces manual Role/RoleBinding management at scale
-* Permissions are continuously synchronized via ManifestWork -- drift is automatically corrected
+* MulticlusterRoleAssignment API replaces ClusterPermission for virtualization RBAC at scale
+* Fine-grained RBAC must be enabled in the MultiClusterHub before creating assignments
+* Hub-level roles (`acm-vm-fleet:view`) are prerequisites for fleet console access
+* Spoke-level roles are distributed via MRA using Placement resources for dynamic cluster targeting
+* The ACM console provides a UI for creating and managing role assignments
 * VM operators get a full console experience scoped to exactly their responsibilities
 * The admin vs. vm-operator console comparison is the most powerful visual in the module
 * Group-based subjects mean team membership changes propagate without manifest updates

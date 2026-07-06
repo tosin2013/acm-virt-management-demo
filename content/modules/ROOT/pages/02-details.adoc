@@ -40,8 +40,8 @@ toc::[]
 | Bind subscription-admin, deploy via Git Subscription
 
 | Module 7: Fine-Grained ACM Permissions
-| 8 min
-| Apply ClusterPermission, demonstrate scoped VM access
+| 10 min
+| Enable fine-grained RBAC, apply MulticlusterRoleAssignment, demonstrate scoped VM access
 
 | Module 8: Eradicate Cluster Destruction
 | 6 min
@@ -62,7 +62,7 @@ toc::[]
 | 4.22+
 
 | Red Hat Advanced Cluster Management
-| 2.16+
+| 2.17+
 
 | OpenShift Virtualization (CNV)
 | 4.22+
@@ -166,7 +166,7 @@ The demo environment consists of one *Hub cluster* running RHACM and one *Studen
 | Managed cluster lifecycle, cluster sets
 
 | `rbac.open-cluster-management.io`
-| ClusterPermission API for fine-grained access
+| MulticlusterRoleAssignment API for fine-grained virtualization access
 
 | `hive.openshift.io`
 | Cluster provisioning lifecycle (protected from deletion)
@@ -290,7 +290,7 @@ oc get route grafana -n open-cluster-management-observability
 | Check policy controller logs: `oc logs -n open-cluster-management deploy/governance-policy-propagator`
 
 | VM operations denied
-| Verify ClusterPermission was applied: `oc get clusterpermissions -n <managed-cluster-name>`
+| Verify MulticlusterRoleAssignment was applied: `oc get multiclusterroleassignments -A`
 |===
 
 == Follow-Up Resources
@@ -299,7 +299,8 @@ oc get route grafana -n open-cluster-management-observability
 * https://docs.openshift.com/container-platform/latest/virt/about_virt/about-virt.html[OpenShift Virtualization Documentation]
 * https://open-cluster-management.io/[Open Cluster Management upstream project]
 * https://github.com/open-cluster-management-io/policy-collection[ACM Policy Collection]
-* https://github.com/open-cluster-management-io/cluster-permission[ClusterPermission Add-on]
+* https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17/html-single/secure_clusters/index#fine-grain-intro[Fine-Grained RBAC for Virtual Machines]
+* https://developers.redhat.com/articles/2026/06/22/right-sizing-recommendations-mcoa-and-perses-dashboards[Right-Sizing with MCOA and Perses Dashboards]
 
 == Authors
 
