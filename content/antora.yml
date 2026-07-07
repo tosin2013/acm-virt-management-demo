@@ -24,6 +24,7 @@ asciidoc:
     student_1_bastion_hostname: "bastion.GUID-s1.sandbox.opentlc.com"
     student_1_bastion_ssh_user: "student"
     student_1_bastion_ssh_password: "PROVIDED_AT_RUNTIME"
+    student_1_admin_password: "PROVIDED_AT_RUNTIME"
     student_1_ssh_command: "ssh student@bastion.GUID-s1.sandbox.opentlc.com"
     # Hub bastion SSH (for reconnect / copy-paste convenience)
     hub_ssh_command: "ssh student@bastion.GUID.sandbox.opentlc.com"

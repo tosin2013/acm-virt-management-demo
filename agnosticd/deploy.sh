@@ -499,6 +499,9 @@ if [[ "$DEPLOY_SHOWROOM" == "true" ]]; then
         echo "student_${i}_bastion_ssh_password: \"$s_bastion_pass\""
         echo "student_${i}_ssh_command: \"ssh ${s_bastion_user}@${s_bastion}\""
 
+        s_admin_pass=$(grep 'openshift_cluster_admin_password:' "$s_data" 2>/dev/null | head -1 | awk '{print $2}' || echo "N/A")
+        echo "student_${i}_admin_password: \"$s_admin_pass\""
+
         s_ingress=$(grep 'openshift_cluster_ingress_domain:' "$s_data" 2>/dev/null | head -1 | awk '{print $2}' || echo "N/A")
         echo "student_${i}_ingress_domain: \"$s_ingress\""
       fi
