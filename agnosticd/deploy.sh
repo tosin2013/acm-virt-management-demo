@@ -242,6 +242,66 @@ oc annotate search search-v2-operator -n open-cluster-management \
   virtual-machine-preview='true' --overwrite
 oc patch multiclusterhub multiclusterhub -n open-cluster-management \
   --type=merge -p '{"spec":{"overrides":{"components":[{"name":"cnv-mtv-integrations","enabled":true}]}}}'
+
+# Install OpenShift Virtualization operator on hub (for console plugin / fleet VM view)
+if ! oc get csv -n openshift-cnv 2>/dev/null | grep -q Succeeded; then
+  echo "   Installing OpenShift Virtualization operator on hub..."
+  oc create ns openshift-cnv 2>/dev/null || true
+  cat <<EOF2 | oc apply -f -
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: kubevirt-hyperconverged-group
+  namespace: openshift-cnv
+spec:
+  targetNamespaces:
+    - openshift-cnv
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: kubevirt-hyperconverged
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+EOF2
+  echo "   Waiting for CNV operator CSV..."
+  for attempt in $(seq 1 60); do
+    phase=$(oc get csv -n openshift-cnv -o jsonpath='{.items[0].status.phase}' 2>/dev/null)
+    if [ "$phase" = "Succeeded" ]; then break; fi
+    if [ "$phase" = "Failed" ] || [ "$attempt" -gt 30 ]; then
+      # Scale down non-essential pods that may fail on small workers
+      oc scale deploy virt-platform-autopilot -n openshift-cnv --replicas=0 2>/dev/null
+      oc scale deploy kubevirt-migration-controller -n openshift-cnv --replicas=0 2>/dev/null
+    fi
+    sleep 5
+  done
+  # Create HyperConverged CR
+  cat <<EOF2 | oc apply -f -
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+  virtualMachineOptions:
+    disableFreePageReporting: false
+  deployment:
+    applicationAwareConfig:
+      enable: false
+    deployVmConsoleProxy: false
+EOF2
+  # Enable console plugin (idempotent)
+  CURRENT_PLUGINS=$(oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins[*]}' 2>/dev/null || echo "")
+  if ! echo "$CURRENT_PLUGINS" | grep -qw "kubevirt-plugin"; then
+    oc patch consoles.operator.openshift.io cluster --type=json \
+      -p='[{"op":"add","path":"/spec/plugins/-","value":"kubevirt-plugin"}]' 2>/dev/null
+  fi
+fi
 FLEET_VIRT_EOF
 
   echo "   Post-import fixups complete."
