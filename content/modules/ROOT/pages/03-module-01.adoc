@@ -435,64 +435,20 @@ You can also view the pipeline run in the student cluster console (see Part 3 ab
 
 If you want to turn this installed VM into a reusable golden image, run sysprep to strip machine-specific identity (SID, hostname). This step is *optional* for the demo but required in production image-building workflows.
 
-* SSH to the student cluster:
-+
-[source,role="execute",subs="attributes+"]
-----
-{student_1_ssh_command}
-----
-+
-Password: `{student_1_bastion_ssh_password}`
+The `post-install.ps1` script (part of the autounattend ConfigMap) has already prepared the VM for sysprep by installing VirtIO drivers, the QEMU Guest Agent, and ejecting the answer file CD. To generalize:
 
-* Stop the VM and swap the autounattend ConfigMap for the sysprep answer file:
-+
-[source,role="execute"]
-----
-virtctl stop win2019-install -n vm-demo-app
-----
-+
-[source,role="execute"]
-----
-oc patch virtualmachine win2019-install -n vm-demo-app --type=json -p='[
-  {"op": "remove", "path": "/spec/template/spec/volumes/3"},
-  {"op": "remove", "path": "/spec/template/spec/domain/devices/disks/3"}
-]'
-----
-+
-[source,role="execute"]
-----
-oc patch virtualmachine win2019-install -n vm-demo-app --type=json -p='[
-  {"op": "add", "path": "/spec/template/spec/domain/devices/disks/-",
-   "value": {"disk": {"bus": "virtio"}, "name": "sysprep"}},
-  {"op": "add", "path": "/spec/template/spec/volumes/-",
-   "value": {"name": "sysprep", "sysprep": {"configMap": {"name": "win2019-sysprep"}}}}
-]'
-----
+* Open the Windows VM console in the student cluster (navigate to *Virtualization* -> *VirtualMachines* -> `win2019-installer` -> *Console*)
 
-* Start the VM and open the console. Windows will boot to the desktop:
+* In the VM desktop, open **PowerShell as Administrator** and run:
 +
-[source,role="execute"]
+[source,powershell]
 ----
-virtctl start win2019-install -n vm-demo-app
+C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown
 ----
++
+The VM will generalize itself (strip SID, hostname, activation state) and shut down automatically. The resulting `win2019-rootdisk` PVC is now a clean golden image that can be cloned for new VMs without SID conflicts.
 
-* From the VM console (or via RDP), run sysprep:
-+
-[source]
-----
-C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /unattend:A:\sysprep-unattend.xml
-----
-+
-The VM will generalize itself and shut down. The resulting `win2019-disk` PVC is now a clean golden image that can be cloned for new VMs without SID conflicts.
-
-* Return to the **Hub terminal**:
-+
-[source,role="execute"]
-----
-exit
-----
-+
-TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
+TIP: In production, you would integrate this sysprep step into the Tekton pipeline so the golden image is produced fully automated — the official KubeVirt `windows-customize` pipeline supports exactly this pattern.
 
 == Key Takeaways
 
