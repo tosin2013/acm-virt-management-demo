@@ -1,0 +1,430 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: windows2k19-autounattend
+  namespace: vm-demo-app
+data:
+  autounattend.xml: |
+    <?xml version="1.0" encoding="utf-8"?>
+    <unattend xmlns="urn:schemas-microsoft-com:unattend"
+              xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+
+      <settings pass="windowsPE">
+        <component name="Microsoft-Windows-International-Core-WinPE"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+          <SetupUILanguage>
+            <UILanguage>en-US</UILanguage>
+          </SetupUILanguage>
+          <InputLocale>0409:00000409</InputLocale>
+          <SystemLocale>en-US</SystemLocale>
+          <UILanguage>en-US</UILanguage>
+          <UserLocale>en-US</UserLocale>
+        </component>
+
+        <component name="Microsoft-Windows-PnpCustomizationsWinPE"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+          <DriverPaths>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="1">
+              <Path>E:\amd64\2k19</Path>
+            </PathAndCredentials>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="2">
+              <Path>E:\NetKVM\2k19\amd64</Path>
+            </PathAndCredentials>
+            <PathAndCredentials wcm:action="add" wcm:keyValue="3">
+              <Path>E:\viostor\2k19\amd64</Path>
+            </PathAndCredentials>
+          </DriverPaths>
+        </component>
+
+        <component name="Microsoft-Windows-Setup"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+
+          <DiskConfiguration>
+            <Disk wcm:action="add">
+              <DiskID>0</DiskID>
+              <WillWipeDisk>true</WillWipeDisk>
+              <CreatePartitions>
+                <CreatePartition wcm:action="add">
+                  <Order>1</Order>
+                  <Size>350</Size>
+                  <Type>Primary</Type>
+                </CreatePartition>
+                <CreatePartition wcm:action="add">
+                  <Order>2</Order>
+                  <Extend>true</Extend>
+                  <Type>Primary</Type>
+                </CreatePartition>
+              </CreatePartitions>
+              <ModifyPartitions>
+                <ModifyPartition wcm:action="add">
+                  <Order>1</Order>
+                  <PartitionID>1</PartitionID>
+                  <Format>NTFS</Format>
+                  <Label>System</Label>
+                  <Active>true</Active>
+                </ModifyPartition>
+                <ModifyPartition wcm:action="add">
+                  <Order>2</Order>
+                  <PartitionID>2</PartitionID>
+                  <Format>NTFS</Format>
+                  <Label>Windows</Label>
+                  <Letter>C</Letter>
+                </ModifyPartition>
+              </ModifyPartitions>
+            </Disk>
+          </DiskConfiguration>
+
+          <ImageInstall>
+            <OSImage>
+              <InstallTo>
+                <DiskID>0</DiskID>
+                <PartitionID>2</PartitionID>
+              </InstallTo>
+            </OSImage>
+          </ImageInstall>
+
+          <UserData>
+            <AcceptEula>true</AcceptEula>
+            <FullName>Administrator</FullName>
+            <Organization>Red Hat</Organization>
+          </UserData>
+        </component>
+      </settings>
+
+      <settings pass="specialize">
+        <component name="Microsoft-Windows-Shell-Setup"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+          <ComputerName>win2019-demo</ComputerName>
+          <TimeZone>UTC</TimeZone>
+        </component>
+
+        <component name="Microsoft-Windows-TerminalServices-LocalSessionManager"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+          <fDenyTSConnections>false</fDenyTSConnections>
+        </component>
+
+        <component name="Networking-MPSSVC-Svc"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+          <FirewallGroups>
+            <FirewallGroup wcm:action="add" wcm:keyValue="RemoteDesktop">
+              <Active>true</Active>
+              <Group>Remote Desktop</Group>
+              <Profile>Domain</Profile>
+            </FirewallGroup>
+          </FirewallGroups>
+        </component>
+      </settings>
+
+      <settings pass="oobeSystem">
+        <component name="Microsoft-Windows-International-Core"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+          <InputLocale>0409:00000409</InputLocale>
+          <SystemLocale>en-US</SystemLocale>
+          <UILanguage>en-US</UILanguage>
+          <UserLocale>en-US</UserLocale>
+        </component>
+
+        <component name="Microsoft-Windows-Shell-Setup"
+                   processorArchitecture="amd64"
+                   publicKeyToken="31bf3856ad364e35"
+                   language="neutral"
+                   versionScope="nonSxS">
+
+          <AutoLogon>
+            <Enabled>true</Enabled>
+            <Username>Administrator</Username>
+            <Password>
+              <Value>R3dH4tD3mo!</Value>
+              <PlainText>true</PlainText>
+            </Password>
+            <LogonCount>3</LogonCount>
+          </AutoLogon>
+
+          <OOBE>
+            <HideEULAPage>true</HideEULAPage>
+            <HideLocalAccountScreen>true</HideLocalAccountScreen>
+            <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+            <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+            <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+            <ProtectYourPC>3</ProtectYourPC>
+            <NetworkLocation>Work</NetworkLocation>
+          </OOBE>
+
+          <UserAccounts>
+            <AdministratorPassword>
+              <Value>R3dH4tD3mo!</Value>
+              <PlainText>true</PlainText>
+            </AdministratorPassword>
+          </UserAccounts>
+
+          <FirstLogonCommands>
+            <SynchronousCommand wcm:action="add">
+              <Order>1</Order>
+              <CommandLine>powershell -ExecutionPolicy Bypass -NoProfile F:\post-install.ps1</CommandLine>
+              <Description>Run post-install script</Description>
+            </SynchronousCommand>
+          </FirstLogonCommands>
+        </component>
+      </settings>
+    </unattend>
+  post-install.ps1: |
+    # Install virtio guest drivers
+    Start-Process msiexec -Wait -ArgumentList "/i E:\virtio-win-gt-x64.msi /qn /passive /norestart"
+
+    # Install qemu guest agent
+    Start-Process msiexec -Wait -ArgumentList "/i E:\guest-agent\qemu-ga-x86_64.msi /qn /passive /norestart"
+
+    # Enable WinRM for remote management
+    Enable-PSRemoting -Force
+    Set-Item WSMan:\localhost\Service\AllowUnencrypted -Value $true
+    Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true
+
+    # Disable Server Manager at logon
+    New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\ServerManager" -Name DoNotOpenServerManagerAtLogon -PropertyType DWORD -Value 1 -Force
+
+    # Rename cached unattend.xml to avoid it is picked up by sysprep
+    if (Test-Path C:\Windows\Panther\unattend.xml) {
+        Rename-Item C:\Windows\Panther\unattend.xml C:\Windows\Panther\unattend.install.xml
+    }
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: windows-2019-bios-installer
+  namespace: vm-demo-app
+  labels:
+    app.kubernetes.io/part-of: windows-golden-image
+spec:
+  description: >-
+    Installs Windows Server 2019 from ISO into a golden-image DataVolume
+    using the official KubeVirt BIOS installer pattern.
+  params:
+    - name: winImageDownloadURL
+      description: URL to Windows Server 2019 ISO (from in-cluster HTTP file server)
+      type: string
+      default: "http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso"
+    - name: autounattendConfigMapName
+      description: ConfigMap with autounattend.xml for unattended install
+      type: string
+      default: windows2k19-autounattend
+    - name: virtioContainerDiskName
+      description: Container disk with VirtIO drivers ISO
+      type: string
+      default: "registry.redhat.io/container-native-virtualization/virtio-win-rhel9:v4.22.0"
+    - name: baseDvName
+      description: Name of the resulting golden-image DataVolume
+      type: string
+      default: win2019-golden
+    - name: diskSize
+      description: Size of the Windows installation disk
+      type: string
+      default: "40Gi"
+    - name: isoSize
+      description: Size of the ISO PVC
+      type: string
+      default: "7Gi"
+  tasks:
+    - name: create-iso-dv
+      params:
+        - name: manifest
+          value: |
+            apiVersion: cdi.kubevirt.io/v1beta1
+            kind: DataVolume
+            metadata:
+              generateName: win2019-iso-
+              namespace: vm-demo-app
+              annotations:
+                cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+            spec:
+              storage:
+                resources:
+                  requests:
+                    storage: $(params.isoSize)
+              source:
+                http:
+                  url: $(params.winImageDownloadURL)
+        - name: waitForSuccess
+          value: "true"
+        - name: allowReplace
+          value: "true"
+      timeout: "2h"
+      taskRef:
+        kind: Task
+        name: modify-data-object
+    - name: create-root-disk-dv
+      params:
+        - name: manifest
+          value: |
+            apiVersion: cdi.kubevirt.io/v1beta1
+            kind: DataVolume
+            metadata:
+              generateName: win2019-rootdisk-
+              namespace: vm-demo-app
+              annotations:
+                cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+            spec:
+              storage:
+                resources:
+                  requests:
+                    storage: $(params.diskSize)
+              source:
+                blank: {}
+        - name: waitForSuccess
+          value: "true"
+        - name: allowReplace
+          value: "true"
+      timeout: "30m"
+      taskRef:
+        kind: Task
+        name: modify-data-object
+    - name: create-installer-vm
+      params:
+        - name: manifest
+          value: |
+            apiVersion: kubevirt.io/v1
+            kind: VirtualMachine
+            metadata:
+              generateName: win2019-installer-
+              namespace: vm-demo-app
+            spec:
+              runStrategy: RerunOnFailure
+              template:
+                spec:
+                  domain:
+                    machine:
+                      type: q35
+                    resources:
+                      requests:
+                        memory: 8Gi
+                    cpu:
+                      cores: 4
+                    devices:
+                      disks:
+                        - name: installcdrom
+                          cdrom:
+                            bus: sata
+                          bootOrder: 1
+                        - name: rootdisk
+                          disk:
+                            bus: virtio
+                          bootOrder: 2
+                        - name: virtiocontainerdisk
+                          cdrom:
+                            bus: sata
+                        - name: sysprep
+                          cdrom:
+                            bus: sata
+                    features:
+                      acpi: {}
+                      hyperv:
+                        relaxed: {}
+                        vapic: {}
+                        spinlocks:
+                          spinlocks: 8191
+                  volumes:
+                    - name: installcdrom
+                      persistentVolumeClaim:
+                        claimName: YOURISO
+                    - name: rootdisk
+                      persistentVolumeClaim:
+                        claimName: YOURDISK
+                    - name: virtiocontainerdisk
+                      containerDisk:
+                        image: $(params.virtioContainerDiskName)
+                    - name: sysprep
+                      sysprep:
+                        configMap:
+                          name: $(params.autounattendConfigMapName)
+        - name: dataVolumes
+          value:
+            - "installcdrom:$(tasks.create-iso-dv.results.name)"
+            - "rootdisk:$(tasks.create-root-disk-dv.results.name)"
+      runAfter:
+        - create-iso-dv
+        - create-root-disk-dv
+      timeout: "10m"
+      taskRef:
+        kind: Task
+        name: create-vm-from-manifest
+    - name: wait-for-install
+      params:
+        - name: vmiName
+          value: $(tasks.create-installer-vm.results.name)
+        - name: vmiNamespace
+          value: vm-demo-app
+        - name: successCondition
+          value: "status.phase == Succeeded"
+        - name: failureCondition
+          value: "status.phase in (Failed, Unknown)"
+      runAfter:
+        - create-installer-vm
+      timeout: "2h"
+      taskRef:
+        kind: Task
+        name: wait-for-vmi-status
+    - name: create-golden-image
+      params:
+        - name: manifest
+          value: |
+            apiVersion: cdi.kubevirt.io/v1beta1
+            kind: DataVolume
+            metadata:
+              name: $(params.baseDvName)
+              namespace: vm-demo-app
+              annotations:
+                cdi.kubevirt.io/storage.bind.immediate.requested: "true"
+            spec:
+              storage: {}
+              source:
+                pvc:
+                  name: $(tasks.create-root-disk-dv.results.name)
+                  namespace: vm-demo-app
+        - name: waitForSuccess
+          value: "true"
+        - name: allowReplace
+          value: "true"
+      runAfter:
+        - wait-for-install
+      timeout: "1h"
+      taskRef:
+        kind: Task
+        name: modify-data-object
+  finally:
+    - name: cleanup-vm
+      params:
+        - name: vmName
+          value: $(tasks.create-installer-vm.results.name)
+        - name: vmNamespace
+          value: vm-demo-app
+        - name: delete
+          value: "true"
+      timeout: "10m"
+      taskRef:
+        kind: Task
+        name: cleanup-vm
+  results:
+    - name: goldenImageName
+      description: Name of the golden image DataVolume
+      value: $(tasks.create-golden-image.results.name)

@@ -1,36 +1,28 @@
----
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: win2019-autounattend
-  namespace: vm-demo-app
 data:
-  Autounattend.xml: |
+  autounattend.xml: |
     <?xml version="1.0" encoding="utf-8"?>
-    <unattend xmlns="urn:schemas-microsoft-com:unattend">
-
+    <unattend xmlns="urn:schemas-microsoft-com:unattend"
+              xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
       <settings pass="windowsPE">
         <component name="Microsoft-Windows-International-Core-WinPE"
                    processorArchitecture="amd64"
                    publicKeyToken="31bf3856ad364e35"
                    language="neutral"
-                   versionScope="nonSxS"
-                   xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+                   versionScope="nonSxS">
           <SetupUILanguage>
             <UILanguage>en-US</UILanguage>
           </SetupUILanguage>
-          <InputLocale>en-US</InputLocale>
+          <InputLocale>0409:00000409</InputLocale>
           <SystemLocale>en-US</SystemLocale>
           <UILanguage>en-US</UILanguage>
           <UserLocale>en-US</UserLocale>
         </component>
-
         <component name="Microsoft-Windows-PnpCustomizationsWinPE"
                    processorArchitecture="amd64"
                    publicKeyToken="31bf3856ad364e35"
                    language="neutral"
-                   versionScope="nonSxS"
-                   xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+                   versionScope="nonSxS">
           <DriverPaths>
             <PathAndCredentials wcm:action="add" wcm:keyValue="1">
               <Path>E:\viostor\2k19\amd64</Path>
@@ -38,28 +30,13 @@ data:
             <PathAndCredentials wcm:action="add" wcm:keyValue="2">
               <Path>E:\NetKVM\2k19\amd64</Path>
             </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="3">
-              <Path>E:\vioscsi\2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="4">
-              <Path>E:\Balloon\2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="5">
-              <Path>E:\vioserial\2k19\amd64</Path>
-            </PathAndCredentials>
-            <PathAndCredentials wcm:action="add" wcm:keyValue="6">
-              <Path>E:\qxldod\2k19\amd64</Path>
-            </PathAndCredentials>
           </DriverPaths>
         </component>
-
         <component name="Microsoft-Windows-Setup"
                    processorArchitecture="amd64"
                    publicKeyToken="31bf3856ad364e35"
                    language="neutral"
-                   versionScope="nonSxS"
-                   xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-
+                   versionScope="nonSxS">
           <DiskConfiguration>
             <Disk wcm:action="add">
               <DiskID>0</DiskID>
@@ -81,7 +58,7 @@ data:
                   <Order>1</Order>
                   <PartitionID>1</PartitionID>
                   <Format>NTFS</Format>
-                  <Label>System Reserved</Label>
+                  <Label>System</Label>
                   <Active>true</Active>
                 </ModifyPartition>
                 <ModifyPartition wcm:action="add">
@@ -94,13 +71,12 @@ data:
               </ModifyPartitions>
             </Disk>
           </DiskConfiguration>
-
           <ImageInstall>
             <OSImage>
               <InstallFrom>
                 <MetaData wcm:action="add">
-                  <Key>/IMAGE/NAME</Key>
-                  <Value>Windows Server 2019 SERVERSTANDARD</Value>
+                  <Key>/IMAGE/INDEX</Key>
+                  <Value>2</Value>
                 </MetaData>
               </InstallFrom>
               <InstallTo>
@@ -109,100 +85,29 @@ data:
               </InstallTo>
             </OSImage>
           </ImageInstall>
-
           <UserData>
             <AcceptEula>true</AcceptEula>
             <FullName>Administrator</FullName>
-            <Organization>Red Hat Demo</Organization>
+            <Organization>Red Hat</Organization>
           </UserData>
         </component>
       </settings>
-
-      <settings pass="specialize">
-        <component name="Microsoft-Windows-Shell-Setup"
-                   processorArchitecture="amd64"
-                   publicKeyToken="31bf3856ad364e35"
-                   language="neutral"
-                   versionScope="nonSxS">
-          <ComputerName>win2019-demo</ComputerName>
-          <TimeZone>UTC</TimeZone>
-        </component>
-
-        <component name="Microsoft-Windows-TerminalServices-LocalSessionManager"
-                   processorArchitecture="amd64"
-                   publicKeyToken="31bf3856ad364e35"
-                   language="neutral"
-                   versionScope="nonSxS">
-          <fDenyTSConnections>false</fDenyTSConnections>
-        </component>
-
-        <component name="Networking-MPSSVC-Svc"
-                   processorArchitecture="amd64"
-                   publicKeyToken="31bf3856ad364e35"
-                   language="neutral"
-                   versionScope="nonSxS">
-          <FirewallGroups>
-            <FirewallGroup wcm:action="add" wcm:keyValue="RemoteDesktop">
-              <Active>true</Active>
-              <Group>Remote Desktop</Group>
-              <Profile>Domain</Profile>
-            </FirewallGroup>
-            <FirewallGroup wcm:action="add" wcm:keyValue="RemoteDesktopPrivate">
-              <Active>true</Active>
-              <Group>Remote Desktop</Group>
-              <Profile>Private</Profile>
-            </FirewallGroup>
-            <FirewallGroup wcm:action="add" wcm:keyValue="RemoteDesktopPublic">
-              <Active>true</Active>
-              <Group>Remote Desktop</Group>
-              <Profile>Public</Profile>
-            </FirewallGroup>
-          </FirewallGroups>
-        </component>
-
-        <component name="Microsoft-Windows-TerminalServices-RDP-WinStationExtensions"
-                   processorArchitecture="amd64"
-                   publicKeyToken="31bf3856ad364e35"
-                   language="neutral"
-                   versionScope="nonSxS">
-          <UserAuthentication>0</UserAuthentication>
-        </component>
-      </settings>
-
       <settings pass="oobeSystem">
         <component name="Microsoft-Windows-International-Core"
                    processorArchitecture="amd64"
                    publicKeyToken="31bf3856ad364e35"
                    language="neutral"
                    versionScope="nonSxS">
-          <InputLocale>en-US</InputLocale>
+          <InputLocale>0409:00000409</InputLocale>
           <SystemLocale>en-US</SystemLocale>
           <UILanguage>en-US</UILanguage>
           <UserLocale>en-US</UserLocale>
         </component>
-
         <component name="Microsoft-Windows-Shell-Setup"
                    processorArchitecture="amd64"
                    publicKeyToken="31bf3856ad364e35"
                    language="neutral"
                    versionScope="nonSxS">
-          <OOBE>
-            <HideEULAPage>true</HideEULAPage>
-            <HideLocalAccountScreen>true</HideLocalAccountScreen>
-            <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
-            <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
-            <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-            <ProtectYourPC>3</ProtectYourPC>
-            <NetworkLocation>Work</NetworkLocation>
-          </OOBE>
-
-          <UserAccounts>
-            <AdministratorPassword>
-              <Value>R3dH4tD3mo!</Value>
-              <PlainText>true</PlainText>
-            </AdministratorPassword>
-          </UserAccounts>
-
           <AutoLogon>
             <Enabled>true</Enabled>
             <Username>Administrator</Username>
@@ -212,29 +117,45 @@ data:
             </Password>
             <LogonCount>3</LogonCount>
           </AutoLogon>
-
+          <OOBE>
+            <HideEULAPage>true</HideEULAPage>
+            <HideLocalAccountScreen>true</HideLocalAccountScreen>
+            <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+            <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+            <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+            <ProtectYourPC>3</ProtectYourPC>
+            <NetworkLocation>Work</NetworkLocation>
+          </OOBE>
+          <UserAccounts>
+            <AdministratorPassword>
+              <Value>R3dH4tD3mo!</Value>
+              <PlainText>true</PlainText>
+            </AdministratorPassword>
+          </UserAccounts>
           <FirstLogonCommands>
             <SynchronousCommand wcm:action="add">
               <Order>1</Order>
-              <CommandLine>msiexec /i E:\guest-agent\qemu-ga-x86_64.msi /qn /norestart</CommandLine>
-              <Description>Install QEMU Guest Agent</Description>
-            </SynchronousCommand>
-            <SynchronousCommand wcm:action="add">
-              <Order>2</Order>
-              <CommandLine>msiexec /i E:\virtio-win-gt-x64.msi /qn /passive /norestart</CommandLine>
-              <Description>Install VirtIO guest tools</Description>
-            </SynchronousCommand>
-            <SynchronousCommand wcm:action="add">
-              <Order>3</Order>
-              <CommandLine>powershell -Command "Enable-PSRemoting -Force; Set-Item WSMan:\localhost\Service\AllowUnencrypted -Value $true; Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true"</CommandLine>
-              <Description>Enable WinRM</Description>
-            </SynchronousCommand>
-            <SynchronousCommand wcm:action="add">
-              <Order>4</Order>
-              <CommandLine>reg add "HKLM\SOFTWARE\Microsoft\ServerManager" /v DoNotOpenServerManagerAtLogon /t REG_DWORD /d 1 /f</CommandLine>
-              <Description>Disable Server Manager at logon</Description>
+              <CommandLine>powershell -ExecutionPolicy Bypass -NoProfile F:\post-install.ps1</CommandLine>
+              <Description>Run post-install script</Description>
             </SynchronousCommand>
           </FirstLogonCommands>
         </component>
       </settings>
     </unattend>
+  post-install.ps1: |
+    Start-Process msiexec -Wait -ArgumentList "/i E:\virtio-win-gt-x64.msi /qn /passive /norestart"
+    Start-Process msiexec -Wait -ArgumentList "/i E:\guest-agent\qemu-ga-x86_64.msi /qn /passive /norestart"
+    Enable-PSRemoting -Force
+    Set-Item WSMan:\localhost\Service\AllowUnencrypted -Value $true
+    Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true
+    New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\ServerManager" -Name DoNotOpenServerManagerAtLogon -PropertyType DWORD -Value 1 -Force
+    if (Test-Path C:\Windows\Panther\unattend.xml) {
+        Rename-Item C:\Windows\Panther\unattend.xml C:\Windows\Panther\unattend.install.xml
+    }
+    (New-Object -COMObject Shell.Application).NameSpace(17).ParseName("F:").InvokeVerb("Eject")
+kind: ConfigMap
+metadata:
+  annotations:
+      {"apiVersion":"v1","data":{"autounattend.xml":"\u003c?xml version=\"1.0\" encoding=\"utf-8\"?\u003e\n\u003cunattend xmlns=\"urn:schemas-microsoft-com:unattend\"\n          xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\"\u003e\n  \u003csettings pass=\"windowsPE\"\u003e\n    \u003ccomponent name=\"Microsoft-Windows-International-Core-WinPE\"\n               processorArchitecture=\"amd64\"\n               publicKeyToken=\"31bf3856ad364e35\"\n               language=\"neutral\"\n               versionScope=\"nonSxS\"\u003e\n      \u003cSetupUILanguage\u003e\n        \u003cUILanguage\u003een-US\u003c/UILanguage\u003e\n      \u003c/SetupUILanguage\u003e\n      \u003cInputLocale\u003e0409:00000409\u003c/InputLocale\u003e\n      \u003cSystemLocale\u003een-US\u003c/SystemLocale\u003e\n      \u003cUILanguage\u003een-US\u003c/UILanguage\u003e\n      \u003cUserLocale\u003een-US\u003c/UserLocale\u003e\n    \u003c/component\u003e\n    \u003ccomponent name=\"Microsoft-Windows-PnpCustomizationsWinPE\"\n               processorArchitecture=\"amd64\"\n               publicKeyToken=\"31bf3856ad364e35\"\n               language=\"neutral\"\n               versionScope=\"nonSxS\"\u003e\n      \u003cDriverPaths\u003e\n        \u003cPathAndCredentials wcm:action=\"add\" wcm:keyValue=\"1\"\u003e\n          \u003cPath\u003eE:\\viostor\\2k19\\amd64\u003c/Path\u003e\n        \u003c/PathAndCredentials\u003e\n        \u003cPathAndCredentials wcm:action=\"add\" wcm:keyValue=\"2\"\u003e\n          \u003cPath\u003eE:\\NetKVM\\2k19\\amd64\u003c/Path\u003e\n        \u003c/PathAndCredentials\u003e\n      \u003c/DriverPaths\u003e\n    \u003c/component\u003e\n    \u003ccomponent name=\"Microsoft-Windows-Setup\"\n               processorArchitecture=\"amd64\"\n               publicKeyToken=\"31bf3856ad364e35\"\n               language=\"neutral\"\n               versionScope=\"nonSxS\"\u003e\n      \u003cDiskConfiguration\u003e\n        \u003cDisk wcm:action=\"add\"\u003e\n          \u003cDiskID\u003e0\u003c/DiskID\u003e\n          \u003cWillWipeDisk\u003etrue\u003c/WillWipeDisk\u003e\n          \u003cCreatePartitions\u003e\n            \u003cCreatePartition wcm:action=\"add\"\u003e\n              \u003cOrder\u003e1\u003c/Order\u003e\n              \u003cSize\u003e350\u003c/Size\u003e\n              \u003cType\u003ePrimary\u003c/Type\u003e\n            \u003c/CreatePartition\u003e\n            \u003cCreatePartition wcm:action=\"add\"\u003e\n              \u003cOrder\u003e2\u003c/Order\u003e\n              \u003cExtend\u003etrue\u003c/Extend\u003e\n              \u003cType\u003ePrimary\u003c/Type\u003e\n            \u003c/CreatePartition\u003e\n          \u003c/CreatePartitions\u003e\n          \u003cModifyPartitions\u003e\n            \u003cModifyPartition wcm:action=\"add\"\u003e\n              \u003cOrder\u003e1\u003c/Order\u003e\n              \u003cPartitionID\u003e1\u003c/PartitionID\u003e\n              \u003cFormat\u003eNTFS\u003c/Format\u003e\n              \u003cLabel\u003eSystem\u003c/Label\u003e\n              \u003cActive\u003etrue\u003c/Active\u003e\n            \u003c/ModifyPartition\u003e\n            \u003cModifyPartition wcm:action=\"add\"\u003e\n              \u003cOrder\u003e2\u003c/Order\u003e\n              \u003cPartitionID\u003e2\u003c/PartitionID\u003e\n              \u003cFormat\u003eNTFS\u003c/Format\u003e\n              \u003cLabel\u003eWindows\u003c/Label\u003e\n              \u003cLetter\u003eC\u003c/Letter\u003e\n            \u003c/ModifyPartition\u003e\n          \u003c/ModifyPartitions\u003e\n        \u003c/Disk\u003e\n      \u003c/DiskConfiguration\u003e\n      \u003cImageInstall\u003e\n        \u003cOSImage\u003e\n          \u003cInstallFrom\u003e\n            \u003cMetaData wcm:action=\"add\"\u003e\n              \u003cKey\u003e/IMAGE/INDEX\u003c/Key\u003e\n              \u003cValue\u003e2\u003c/Value\u003e\n            \u003c/MetaData\u003e\n          \u003c/InstallFrom\u003e\n          \u003cInstallTo\u003e\n            \u003cDiskID\u003e0\u003c/DiskID\u003e\n            \u003cPartitionID\u003e2\u003c/PartitionID\u003e\n          \u003c/InstallTo\u003e\n        \u003c/OSImage\u003e\n      \u003c/ImageInstall\u003e\n      \u003cUserData\u003e\n        \u003cAcceptEula\u003etrue\u003c/AcceptEula\u003e\n        \u003cFullName\u003eAdministrator\u003c/FullName\u003e\n        \u003cOrganization\u003eRed Hat\u003c/Organization\u003e\n      \u003c/UserData\u003e\n    \u003c/component\u003e\n  \u003c/settings\u003e\n  \u003csettings pass=\"oobeSystem\"\u003e\n    \u003ccomponent name=\"Microsoft-Windows-International-Core\"\n               processorArchitecture=\"amd64\"\n               publicKeyToken=\"31bf3856ad364e35\"\n               language=\"neutral\"\n               versionScope=\"nonSxS\"\u003e\n      \u003cInputLocale\u003e0409:00000409\u003c/InputLocale\u003e\n      \u003cSystemLocale\u003een-US\u003c/SystemLocale\u003e\n      \u003cUILanguage\u003een-US\u003c/UILanguage\u003e\n      \u003cUserLocale\u003een-US\u003c/UserLocale\u003e\n    \u003c/component\u003e\n    \u003ccomponent name=\"Microsoft-Windows-Shell-Setup\"\n               processorArchitecture=\"amd64\"\n               publicKeyToken=\"31bf3856ad364e35\"\n               language=\"neutral\"\n               versionScope=\"nonSxS\"\u003e\n      \u003cAutoLogon\u003e\n        \u003cEnabled\u003etrue\u003c/Enabled\u003e\n        \u003cUsername\u003eAdministrator\u003c/Username\u003e\n        \u003cPassword\u003e\n          \u003cValue\u003eR3dH4tD3mo!\u003c/Value\u003e\n          \u003cPlainText\u003etrue\u003c/PlainText\u003e\n        \u003c/Password\u003e\n        \u003cLogonCount\u003e3\u003c/LogonCount\u003e\n      \u003c/AutoLogon\u003e\n      \u003cOOBE\u003e\n        \u003cHideEULAPage\u003etrue\u003c/HideEULAPage\u003e\n        \u003cHideLocalAccountScreen\u003etrue\u003c/HideLocalAccountScreen\u003e\n        \u003cHideOnlineAccountScreens\u003etrue\u003c/HideOnlineAccountScreens\u003e\n        \u003cHideOEMRegistrationScreen\u003etrue\u003c/HideOEMRegistrationScreen\u003e\n        \u003cHideWirelessSetupInOOBE\u003etrue\u003c/HideWirelessSetupInOOBE\u003e\n        \u003cProtectYourPC\u003e3\u003c/ProtectYourPC\u003e\n        \u003cNetworkLocation\u003eWork\u003c/NetworkLocation\u003e\n      \u003c/OOBE\u003e\n      \u003cUserAccounts\u003e\n        \u003cAdministratorPassword\u003e\n          \u003cValue\u003eR3dH4tD3mo!\u003c/Value\u003e\n          \u003cPlainText\u003etrue\u003c/PlainText\u003e\n        \u003c/AdministratorPassword\u003e\n      \u003c/UserAccounts\u003e\n      \u003cFirstLogonCommands\u003e\n        \u003cSynchronousCommand wcm:action=\"add\"\u003e\n          \u003cOrder\u003e1\u003c/Order\u003e\n          \u003cCommandLine\u003epowershell -ExecutionPolicy Bypass -NoProfile F:\\post-install.ps1\u003c/CommandLine\u003e\n          \u003cDescription\u003eRun post-install script\u003c/Description\u003e\n        \u003c/SynchronousCommand\u003e\n      \u003c/FirstLogonCommands\u003e\n    \u003c/component\u003e\n  \u003c/settings\u003e\n\u003c/unattend\u003e\n","post-install.ps1":"Start-Process msiexec -Wait -ArgumentList \"/i E:\\virtio-win-gt-x64.msi /qn /passive /norestart\"\nStart-Process msiexec -Wait -ArgumentList \"/i E:\\guest-agent\\qemu-ga-x86_64.msi /qn /passive /norestart\"\nEnable-PSRemoting -Force\nSet-Item WSMan:\\localhost\\Service\\AllowUnencrypted -Value $true\nSet-Item WSMan:\\localhost\\Service\\Auth\\Basic -Value $true\nNew-ItemProperty -Path \"HKLM:\\SOFTWARE\\Microsoft\\ServerManager\" -Name DoNotOpenServerManagerAtLogon -PropertyType DWORD -Value 1 -Force\nif (Test-Path C:\\Windows\\Panther\\unattend.xml) {\n    Rename-Item C:\\Windows\\Panther\\unattend.xml C:\\Windows\\Panther\\unattend.install.xml\n}\n(New-Object -COMObject Shell.Application).NameSpace(17).ParseName(\"F:\").InvokeVerb(\"Eject\")\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"windows2k19-autounattend","namespace":"vm-demo-app"}}
+  name: windows2k19-autounattend
+  namespace: vm-demo-app
