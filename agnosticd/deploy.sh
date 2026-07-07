@@ -190,7 +190,7 @@ if [[ -n "$HUB_BASTION_HOST" && -n "$HUB_BASTION_PASS" ]]; then
 if ! oc get deploy openshift-gitops-applicationset-controller -n openshift-gitops &>/dev/null; then
   echo "   Enabling ApplicationSet controller..."
   oc patch argocd openshift-gitops -n openshift-gitops --type=merge \
-    -p '{"spec":{"applicationSet":{"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}}}'
+    -p '{"spec":{"applicationSet":{"enabled":true,"resources":{"limits":{"cpu":"1","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}}}'
 fi
 FIXUP_EOF
 
@@ -203,6 +203,22 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ManagedClusterAddOn
 metadata:
   name: application-manager
+  namespace: student-${i}
+spec:
+  installNamespace: open-cluster-management-agent-addon
+---
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: governance-policy-framework
+  namespace: student-${i}
+spec:
+  installNamespace: open-cluster-management-agent-addon
+---
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddOn
+metadata:
+  name: config-policy-controller
   namespace: student-${i}
 spec:
   installNamespace: open-cluster-management-agent-addon

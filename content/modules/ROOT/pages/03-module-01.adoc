@@ -177,6 +177,21 @@ _With ArgoCD integrated, you can now deploy VMs using an ApplicationSet. The Fed
 
 NOTE: Ensure you are on the **Hub terminal** for all commands in this part. The ApplicationSet and ArgoCD resources are created on the Hub cluster.
 
+* First, verify the ApplicationSet controller is running. In OpenShift GitOps 1.21+, the controller must be explicitly enabled:
++
+[source,role="execute"]
+----
+if ! oc get deploy openshift-gitops-applicationset-controller -n openshift-gitops &>/dev/null; then
+  echo "WARNING: ApplicationSet controller not running — enabling it now..."
+  oc patch argocd openshift-gitops -n openshift-gitops --type=merge \
+    -p '{"spec":{"applicationSet":{"enabled":true}}}'
+  echo "Waiting for controller to start..."
+  oc rollout status deploy/openshift-gitops-applicationset-controller -n openshift-gitops --timeout=60s
+else
+  echo "OK: ApplicationSet controller is running."
+fi
+----
+
 * Apply the ApplicationSet that deploys a Fedora VM to all virtualization-enabled clusters:
 +
 [source,role="execute"]
