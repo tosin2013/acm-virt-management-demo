@@ -259,6 +259,7 @@ if [[ "$DEPLOY_SHOWROOM" == "true" ]]; then
     echo "hub_console_url: \"$HUB_CONSOLE_URL\""
     echo "hub_api_url: \"$HUB_API_URL\""
     echo "hub_bastion_hostname: \"$HUB_BASTION\""
+    echo "hub_ssh_command: \"ssh student@$HUB_BASTION\""
     echo "num_students: $NUM_STUDENTS"
     if [[ -n "$GRAFANA_URL" ]]; then
       echo "grafana_url: \"$GRAFANA_URL\""

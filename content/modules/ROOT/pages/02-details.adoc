@@ -80,17 +80,30 @@ include::partial$credentials.adoc[]
 
 == Connecting to Clusters
 
-The Showroom terminal is connected to the *Hub cluster bastion*. Commands you run there execute against the Hub cluster by default.
+The Showroom terminal is connected to the *Hub terminal* (Hub cluster bastion). Commands you run there execute against the Hub cluster by default.
 
 === Hub Cluster
 
-The Hub bastion is pre-configured with `oc` and a kubeconfig for the Hub cluster:
+The Hub terminal is pre-configured with `oc` and a kubeconfig for the Hub cluster. Verify your connection:
 
 [source,role="execute"]
 ----
 oc whoami
 oc get managedclusters
 ----
+
+[NOTE]
+.Lost your Hub terminal session?
+====
+If you opened a new terminal or got disconnected, reconnect to the Hub terminal:
+
+[source,subs="attributes+"]
+----
+{hub_ssh_command}
+----
+
+Password: `{bastion_ssh_password}`
+====
 
 === Student Cluster (Managed Cluster)
 
@@ -105,13 +118,13 @@ Password: `{student_1_bastion_ssh_password}`
 
 Once connected, the student bastion has its own kubeconfig:
 
-[source,bash]
+[source,role="execute"]
 ----
 oc whoami
 oc get nodes
 ----
 
-To return to the Hub terminal, type `exit`.
+To return to the Hub terminal, type `exit`. If `exit` doesn't return you to the Hub prompt (e.g., you opened a separate terminal), reconnect using the Hub SSH command above.
 
 [TIP]
 ====

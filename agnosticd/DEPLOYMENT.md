@@ -291,5 +291,6 @@ Student cluster data is available in the Antora lab content as attributes:
 | `{student_1_ssh_command}` | Full SSH command for student 1 |
 | `{hub_console_url}` | Hub cluster console URL |
 | `{hub_api_url}` | Hub cluster API URL |
+| `{hub_ssh_command}` | Full SSH command for Hub bastion |
 | `{grafana_url}` | RHACM Observability Grafana URL |
 | `{num_students}` | Total number of students deployed |

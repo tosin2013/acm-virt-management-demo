@@ -15,7 +15,7 @@ _RHACM 2.17 introduces a dedicated fine-grained RBAC subsystem for virtualizatio
 
 === Show
 
-NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. If disconnected, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`). See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for full details.
 
 * Enable the fine-grained RBAC component in the MultiClusterHub:
 +
@@ -264,7 +264,7 @@ The `vm-operator` user can **Stop**, **Restart**, **Reset**, access the **Consol
 Open the admin console and the vm-operator console side by side to show the contrast. The admin sees the full RHACM feature set; the vm-operator sees only what they need -- Fleet Virtualization for their assigned clusters.
 ====
 
-* Back in the **Hub terminal**, verify the access boundaries with CLI checks:
+* Back in the **Hub terminal** (if disconnected, reconnect with: `{hub_ssh_command}`, password: `{bastion_ssh_password}`), verify the access boundaries with CLI checks:
 +
 [source,role="execute"]
 ----

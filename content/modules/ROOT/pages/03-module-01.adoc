@@ -7,7 +7,16 @@ toc::[]
 
 [IMPORTANT]
 ====
-All commands in this module run from the **Hub cluster terminal** unless otherwise noted. Verify you are on the Hub bastion and logged into OpenShift before proceeding:
+All commands in this module run from the **Hub terminal** unless otherwise noted. Verify you are connected and logged into OpenShift before proceeding.
+
+If you need to reconnect to the Hub terminal:
+
+[source,subs="attributes+"]
+----
+{hub_ssh_command}
+----
+
+Password: `{bastion_ssh_password}`
 ====
 
 [source,role="execute"]
@@ -314,12 +323,14 @@ oc get virtualmachine win2019-install -n vm-demo-app
 +
 The `win2019-iso` DataVolume should show `Succeeded` (ISO imported). The `win2019-disk` DataVolume shows `Succeeded` (blank disk provisioned). The VM should be in `Running` state (Windows is installing from the ISO).
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 [NOTE]
 ====
@@ -387,12 +398,14 @@ The `win2019-iso` DataVolume should show `Succeeded` (ISO imported). The `win201
 
 image::module-01-windows-desktop.png[Windows Server 2019 desktop with VirtIO drivers installed]
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 [TIP]
 ====
@@ -453,12 +466,14 @@ C:\Windows\System32\Sysprep\sysprep.exe /generalize /oobe /shutdown /unattend:A:
 +
 The VM will generalize itself and shut down. The resulting `win2019-disk` PVC is now a clean golden image that can be cloned for new VMs without SID conflicts.
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 == Key Takeaways
 

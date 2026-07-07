@@ -78,7 +78,7 @@ workloads:
   - agnosticd.core_workloads.ocp4_workload_cert_manager
   - agnosticd.core_workloads.ocp4_workload_authentication_htpasswd
   - agnosticd.core_workloads.ocp4_workload_openshift_virtualization
-  - ocp4_workload_openshift_pipelines
+  - agnosticd.core_workloads.ocp4_workload_pipelines
   - ocp4_workload_rhacm_import
 
 # ===================================================================

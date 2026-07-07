@@ -25,7 +25,7 @@ Combined with OpenShift GitOps (ArgoCD), the Git repository becomes the immutabl
 
 === Show
 
-NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. If disconnected, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`). See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for full details.
 
 * Review the current RBAC setup -- note that the demo-deployer user does NOT have cluster-admin:
 +
@@ -173,12 +173,14 @@ image::module-06-vm-fleet-virt.png[Fleet Virtualization showing nginx-subscripti
 
 * You can also verify the VM from the ACM console: switch to the *Fleet Virtualization* perspective and expand *student-1* → *vm-subscription-demo* to see the `nginx-subscription-vm` running alongside your other VMs.
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 == Part 4 -- Proving Non-Admin Deployment Works
 

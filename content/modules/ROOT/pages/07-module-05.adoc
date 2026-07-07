@@ -54,7 +54,7 @@ RHACM 2.16 deploys right-sizing **automatically** when observability is enabled.
 
 === Show
 
-NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. If disconnected, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`). See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for full details.
 
 * Verify that the built-in right-sizing policies are already deployed and Compliant:
 +
@@ -118,12 +118,14 @@ oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
 +
 The recommendations include a 10% headroom margin (configurable via `rs-virt-config`). Compare these to the actual requests -- over-provisioned VMs will show a recommendation far below the current request.
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 [TIP]
 ====
@@ -247,12 +249,14 @@ The VM is now running with the recommended memory allocation -- reduced from 4Gi
 The right-sizing Grafana dashboard uses daily aggregation recording rules (`acm_rs_vm:*`). The raw Prometheus metrics update immediately, but the dashboard panels will reflect the new allocation after the next aggregation cycle (up to 24 hours). Point this out to the customer: "In production, you'd see the dashboard update by the next business day -- proving the feedback loop works end to end."
 ====
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 * Re-enable ArgoCD auto-sync by restoring the ApplicationSet template and Application:
 +
@@ -315,12 +319,14 @@ oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
 +
 For a freshly installed Windows Server 2019 that is idle, expect the recommendation to be significantly lower than the 4-core / 16 GiB allocation. In production, Windows VMs running actual workloads would show higher utilization -- the key is measuring before resizing.
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 [IMPORTANT]
 ====

@@ -25,7 +25,7 @@ RHACM uses `ConfigurationPolicy` resources to wrap kubevirt.io objects in a decl
 
 === Show
 
-NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. If disconnected, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`). See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for full details.
 
 NOTE: The student cluster was already labeled `virtualization-enabled=true` in Module 1. If you skipped Module 1, run: `oc label managedcluster {student_cluster_name} virtualization-enabled=true --overwrite`
 
@@ -60,12 +60,14 @@ oc create namespace vm-production --dry-run=client -o yaml | oc apply -f -
 oc create namespace vm-staging --dry-run=client -o yaml | oc apply -f -
 ----
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 * Review the Placement resource that targets virtualization-enabled clusters:
 +
@@ -132,12 +134,14 @@ oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
   promtool query instant http://localhost:9090 'kubevirt:vm_cpu_usage_ratio'
 ----
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 == Part 3 -- VM Backup Enforcement Policy
 
@@ -227,12 +231,14 @@ oc delete schedule vm-critical-backup -n openshift-adp
 oc get schedule -n openshift-adp
 ----
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 [NOTE]
 ====
@@ -295,12 +301,14 @@ oc get networkpolicy -n vm-production
 oc get limitrange -n vm-production
 ----
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 == Part 5 -- VM Eviction Strategy and Security Hardening
 
@@ -347,12 +355,14 @@ Password: `{student_1_bastion_ssh_password}`
 oc get virtualmachineclusterpreferences hardened-server-vm -o yaml
 ----
 
-* Return to the Hub terminal:
+* Return to the **Hub terminal**:
 +
 [source,role="execute"]
 ----
 exit
 ----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 [NOTE]
 ====

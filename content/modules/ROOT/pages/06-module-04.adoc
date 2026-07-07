@@ -44,7 +44,7 @@ RHACM deploys the Cluster Monitoring Operator integration that:
 
 === Show
 
-NOTE: Ensure you are on the **Hub cluster terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for setup.
+NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. If disconnected, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`). See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for full details.
 
 * Open Grafana at {grafana_url}
 
@@ -127,7 +127,7 @@ image::grafana-resource-utilization.png[Grafana Resource Utilization dashboard w
 
 * Check for active right-sizing alerts in the ACM console:
 ** Navigate to *Infrastructure* → *Clusters* → select a managed cluster → *Add-ons*
-** Or query the managed cluster directly:
+** Or query the right-sizing rules from the **Hub terminal** (these are replicated via observability):
 +
 [source,role="execute"]
 ----
