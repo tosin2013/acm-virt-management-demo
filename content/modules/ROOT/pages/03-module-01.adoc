@@ -392,7 +392,7 @@ oc get virtualmachine win2019-install -n vm-demo-app
 The `win2019-iso` DataVolume should show `Succeeded` (ISO imported). The `win2019-disk` DataVolume shows `Succeeded` (blank disk provisioned). The VM should be in `Running` state (Windows is installing from the ISO).
 
 * Access the Windows VM desktop through the student cluster's OpenShift console:
-** Navigate to {student_1_console_url}
+** Navigate to {student_1_console_url} and log in with username `admin` / password `{student_1_bastion_ssh_password}` (see xref:02-details.adoc#web-console-login[Logging into the Web Consoles])
 ** Go to *Virtualization* -> *VirtualMachines* -> select `win2019-install` -> *Console*
 ** You should see Windows Setup running (or the desktop if installation completed)
 

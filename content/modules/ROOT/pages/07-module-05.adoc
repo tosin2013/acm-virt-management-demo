@@ -136,7 +136,7 @@ Point out to the customer: "These recording rules were deployed automatically by
 
 === Show
 
-* Open Grafana at {grafana_url}
+* Open Grafana at {grafana_url} -- click *Sign in with OpenShift* and use the Hub credentials (`{user}` / `{password}`). See xref:02-details.adoc#web-console-login[Logging into the Web Consoles] for details.
 
 * In the left navigation, go to *Dashboards* and open the *RightSizing Recommendation* folder
 

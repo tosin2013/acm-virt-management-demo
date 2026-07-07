@@ -200,7 +200,7 @@ _RHACM 2.17 also provides a console UI for creating role assignments without wri
 
 === Show
 
-* In the ACM console, navigate to **Infrastructure** → **Virtual Machines** → **Settings** → **Role Assignments**
+* Open the ACM console at {openshift_console_url} and log in with `{user}` / `{password}` if not already logged in (see xref:02-details.adoc#web-console-login[Logging into the Web Consoles]). Navigate to **Infrastructure** → **Virtual Machines** → **Settings** → **Role Assignments**
 
 * From the Role Assignments tab, you can:
 ** View all existing role assignments across the fleet

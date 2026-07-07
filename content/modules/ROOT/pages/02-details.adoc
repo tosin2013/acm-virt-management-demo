@@ -78,6 +78,36 @@ toc::[]
 
 include::partial$credentials.adoc[]
 
+[[web-console-login]]
+== Logging into the Web Consoles
+
+Several modules require you to interact with web UIs. Here is how to log in to each.
+
+=== Hub OpenShift / ACM Console
+
+. Open the Hub console: {openshift_console_url}
+. Log in with:
+** *Username:* `{user}`
+** *Password:* `{password}`
+. After login you have access to both the standard OpenShift console and the RHACM console (accessible via the perspective switcher or *All Clusters* view).
+
+=== Student Cluster Console
+
+. Open the Student console: {student_1_console_url}
+. Log in with:
+** *Username:* `admin`
+** *Password:* `{student_1_bastion_ssh_password}`
+
+=== Grafana (RHACM Observability)
+
+. Open Grafana: {grafana_url}
+. Grafana uses OpenShift OAuth -- click *Sign in with OpenShift* and use the Hub credentials (`{user}` / `{password}`).
+
+[TIP]
+====
+You only need to log in once per browser session. Keep the console tabs open as you work through the modules.
+====
+
 == Connecting to Clusters
 
 The Showroom terminal is connected to the *Hub terminal* (Hub cluster bastion). Commands you run there execute against the Hub cluster by default.
