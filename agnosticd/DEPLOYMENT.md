@@ -279,6 +279,36 @@ to Microsoft licensing. It must be uploaded once per deployment. The DataVolume 
 (`http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso`), so the
 ISO must be present before the Windows VM ArgoCD Application can sync successfully.
 
+### Execution Environment Image Pull Failure
+
+If `deploy.sh` fails with an error like:
+
+```
+Error: unable to copy from source docker://quay.io/agnosticd/ee-multicloud:chained-YYYY-MM-DD
+Tag chained-YYYY-MM-DD was deleted or has expired
+```
+
+The `chained-*` execution environment (EE) image tags are built on-demand -- not
+daily. Your `ansible-navigator.yml` may reference a tag that doesn't exist yet.
+
+**Fix:** Edit `~/Development/agnosticd-v2/ansible-navigator.yml` and change the
+image tag to a known good value:
+
+```yaml
+ansible-navigator:
+  execution-environment:
+    container-engine: podman
+    image: quay.io/agnosticd/ee-multicloud:chained-latest   # always available
+    pull:
+      policy: missing
+```
+
+Alternatively, list available tags and pick the most recent one:
+
+```bash
+podman search --list-tags quay.io/agnosticd/ee-multicloud | grep chained | sort
+```
+
 ### Showroom Variable Naming
 
 Student cluster data is available in the Antora lab content as attributes:
