@@ -252,6 +252,205 @@ fi
 echo ""
 
 # -----------------------------------------------------------------
+# Step 2c: Deploy HTTP file server on each student cluster
+#   Required for Windows ISO hosting (Module 1 Part 3).
+#   Deploys: namespace, PVC, BuildConfig, Deployment with OAuth proxy,
+#   Service, and Route.
+# -----------------------------------------------------------------
+echo "==> Deploying HTTP file server on student clusters..."
+for i in $(seq 1 "$NUM_STUDENTS"); do
+  s_guid="${BASE_GUID}-s${i}"
+  s_user_data="$OUTPUT_DIR/${s_guid}_user_data.yaml"
+  S_BASTION_HOST=$(grep 'bastion_public_hostname:' "$s_user_data" 2>/dev/null | head -1 | awk '{print $2}')
+  S_BASTION_PASS=$(grep 'bastion_ssh_password:' "$s_user_data" 2>/dev/null | head -1 | awk '{print $2}')
+
+  if [[ -z "$S_BASTION_HOST" || -z "$S_BASTION_PASS" ]]; then
+    echo "   WARNING: Could not determine student-${i} bastion — skipping file server deploy."
+    continue
+  fi
+
+  echo "   Deploying httpd-fileserver on student-${i}..."
+  sshpass -p "$S_BASTION_PASS" ssh -o StrictHostKeyChecking=no "student@${S_BASTION_HOST}" bash -s <<'FILESERVER_EOF'
+set -e
+oc new-project httpd-server 2>/dev/null || oc project httpd-server
+
+# PVC for file storage
+oc apply -f - <<'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: httpd-fileserver-data
+  namespace: httpd-server
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: gp3-csi
+  resources:
+    requests:
+      storage: 20Gi
+EOF
+
+# ImageStream + BuildConfig
+oc apply -f - <<'EOF'
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: httpd-fileserver
+  namespace: httpd-server
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: httpd-fileserver
+  namespace: httpd-server
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/tosin2013/acm-virt-management-demo.git
+      ref: main
+    contextDir: components/httpd-fileserver
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: httpd-fileserver:latest
+  triggers:
+    - type: ConfigChange
+EOF
+
+# Wait for build to complete
+echo "   Waiting for image build..."
+sleep 5
+BUILD=$(oc get builds -n httpd-server --no-headers -o name | tail -1)
+if [[ -n "$BUILD" ]]; then
+  oc wait --for=condition=Complete "$BUILD" -n httpd-server --timeout=300s
+fi
+
+# ServiceAccount + OAuth secret
+oc create sa httpd-fileserver -n httpd-server 2>/dev/null || true
+oc annotate sa httpd-fileserver -n httpd-server \
+  serviceaccounts.openshift.io/oauth-redirectreference.primary='{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"httpd-server"}}' --overwrite
+oc create secret generic httpd-proxy-cookie \
+  --from-literal=session_secret=$(openssl rand -base64 32) \
+  -n httpd-server 2>/dev/null || true
+
+# Deployment + Service + Route
+oc apply -f - <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpd-fileserver
+  namespace: httpd-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpd-fileserver
+  template:
+    metadata:
+      labels:
+        app: httpd-fileserver
+    spec:
+      serviceAccountName: httpd-fileserver
+      containers:
+        - name: httpd-fileserver
+          image: image-registry.openshift-image-registry.svc:5000/httpd-server/httpd-fileserver:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SERVICE_URL
+              value: "http://httpd-server.httpd-server.svc.cluster.local:8080"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+        - name: oauth-proxy
+          image: registry.redhat.io/openshift4/ose-oauth-proxy:v4.14
+          args:
+            - --https-address=:8443
+            - --provider=openshift
+            - --openshift-service-account=httpd-fileserver
+            - --upstream=http://localhost:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/secrets/session_secret
+            - --cookie-refresh=0
+            - "--openshift-delegate-urls={\"/\":{\"resource\":\"services\",\"verb\":\"get\",\"namespace\":\"httpd-server\"}}"
+          ports:
+            - containerPort: 8443
+              name: https
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/tls/private
+              readOnly: true
+            - name: cookie-secret
+              mountPath: /etc/proxy/secrets
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: httpd-fileserver-data
+        - name: tls
+          secret:
+            secretName: httpd-server-tls
+        - name: cookie-secret
+          secret:
+            secretName: httpd-proxy-cookie
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpd-server
+  namespace: httpd-server
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: httpd-server-tls
+spec:
+  selector:
+    app: httpd-fileserver
+  ports:
+    - name: https
+      port: 8443
+      targetPort: 8443
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: httpd-server
+  namespace: httpd-server
+spec:
+  to:
+    kind: Service
+    name: httpd-server
+  port:
+    targetPort: https
+  tls:
+    termination: reencrypt
+EOF
+
+echo "   Waiting for deployment rollout..."
+oc rollout status deploy/httpd-fileserver -n httpd-server --timeout=120s
+echo "   HTTP file server deployed successfully."
+FILESERVER_EOF
+done
+echo ""
+
+# -----------------------------------------------------------------
 # Step 3: Deploy Showroom on hub with student cluster data
 #   Generates a hub vars file that appends student cluster details
 #   as Showroom Antora attributes. Operators skip (idempotency).
