@@ -5,7 +5,7 @@ metadata:
   name: win2019-autounattend
   namespace: vm-demo-app
 data:
-  autounattend.xml: |
+  Autounattend.xml: |
     <?xml version="1.0" encoding="utf-8"?>
     <unattend xmlns="urn:schemas-microsoft-com:unattend">
 
