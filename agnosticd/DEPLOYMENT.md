@@ -91,16 +91,31 @@ Your directory structure should look like:
 
 ## Secrets Configuration
 
-Copy your sandbox secrets file:
+Create a secrets file named to match your **ACCOUNT** value. The `ACCOUNT` environment
+variable (default: `sandbox3008`) tells `agd` which secrets file to read. The filename
+must follow the pattern `secrets-<ACCOUNT>.yml`.
 
 ```bash
-cp agnosticd-v2-secrets/secrets-sandboxXXX.yml agnosticd-v2-secrets/secrets-sandbox3008.yml
+cd ~/Development/agnosticd-v2-secrets
+
+# If using the default ACCOUNT=sandbox3008:
+cp secrets-example.yml secrets-sandbox3008.yml
+
+# If using your own account name (e.g., ACCOUNT=mylab):
+cp secrets-example.yml secrets-mylab.yml
 ```
 
-Fill in:
-- `aws_access_key_id`
-- `aws_secret_access_key`
-- `base_domain: sandbox3008.opentlc.com`
+Fill in **your own environment's** values:
+
+```yaml
+aws_access_key_id: "AKIA..."
+aws_secret_access_key: "wJalr..."
+base_domain: "sandbox3008.opentlc.com"   # ← replace with YOUR base domain
+```
+
+> **Important:** The `ACCOUNT` variable in `deploy.sh` and the secrets filename must
+> match. If you set `ACCOUNT=mylab`, the secrets file must be `secrets-mylab.yml` and
+> `base_domain` must be your actual domain (e.g., `mylab.example.com`).
 
 ## Deployment
 
@@ -137,21 +152,33 @@ RHACM, and generates a `student-info.txt` summary — no manual `oc` commands ne
 
 ```bash
 cd ~/Development/agnosticd-v2-vars/acm-virt-management-demo
-./deploy.sh
+./agnosticd/deploy.sh
 ```
 
-Environment variables:
+#### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NUM_STUDENTS` | `1` | Number of student clusters |
-| `STUDENT_TYPE` | `sno` | Student cluster topology: `sno` (single bare-metal node) or `multinode` (3 masters + 3 workers) |
-| `PARALLEL` | `false` | Parallel student provisioning |
-| `DEPLOY_HUB` | `true` | Deploy the RHACM hub cluster |
-| `DEPLOY_SHOWROOM` | `true` | Deploy Showroom after students (with their data) |
-| `HUB_GUID` | `acmvirt-hub` | GUID for the hub cluster |
-| `ACCOUNT` | `sandbox3008` | AgnosticD account name |
-| `SKIP_QUOTA_CHECK` | `false` | Bypass quota pre-flight |
+All variables have sensible defaults — you only need to set them if your environment
+differs from the defaults. Export them before running `deploy.sh` or pass inline:
+
+```bash
+# Example: custom account with 2 students
+ACCOUNT=mylab NUM_STUDENTS=2 ./agnosticd/deploy.sh
+```
+
+| Variable | Default | Description | When to change |
+|----------|---------|-------------|----------------|
+| `NUM_STUDENTS` | `1` | Number of student clusters | Multi-student workshops |
+| `STUDENT_TYPE` | `sno` | `sno` or `multinode` | Need HA/live migration |
+| `PARALLEL` | `false` | Parallel student provisioning | >2 students |
+| `DEPLOY_HUB` | `true` | Deploy the RHACM hub cluster | Set `false` if hub already exists |
+| `DEPLOY_SHOWROOM` | `true` | Deploy Showroom after students | Set `false` to skip lab guide |
+| `HUB_GUID` | `acmvirt-hub` | GUID for the hub cluster | Must be unique per deployment |
+| `ACCOUNT` | `sandbox3008` | AgnosticD account name (matches secrets filename) | **Always set to your account** |
+| `SKIP_QUOTA_CHECK` | `false` | Bypass quota pre-flight | Only if you've verified manually |
+
+> **Critical:** If you are NOT using the `sandbox3008` account, you **must** set
+> `ACCOUNT` to match your secrets file. For example, if your secrets file is
+> `secrets-mylab.yml`, run: `ACCOUNT=mylab ./agnosticd/deploy.sh`
 
 ### Cost-Optimized: SNO Students (Default)
 
@@ -161,10 +188,10 @@ bare-metal KVM support for OpenShift Virtualization.
 
 ```bash
 # Default — SNO students
-./deploy.sh
+./agnosticd/deploy.sh
 
 # Explicit
-STUDENT_TYPE=sno ./deploy.sh
+STUDENT_TYPE=sno ./agnosticd/deploy.sh
 ```
 
 **Quota requirements (1 hub + 1 SNO student):**
@@ -187,7 +214,7 @@ STUDENT_TYPE=sno ./deploy.sh
 For production-like environments or when live migration testing is needed:
 
 ```bash
-STUDENT_TYPE=multinode ./deploy.sh
+STUDENT_TYPE=multinode ./agnosticd/deploy.sh
 ```
 
 This deploys students with 3x m5.metal workers (same as hub). Requires 604+ vCPUs
@@ -196,17 +223,17 @@ of AWS quota — request an increase before deploying.
 ### Hub-only Deployment
 
 ```bash
-NUM_STUDENTS=0 ./deploy.sh
+NUM_STUDENTS=0 ./agnosticd/deploy.sh
 ```
 
 ### Re-running After a Partial Failure
 
-Simply re-run `./deploy.sh`. Already-installed operators are detected and skipped
+Simply re-run `./agnosticd/deploy.sh`. Already-installed operators are detected and skipped
 automatically. The script picks up where it left off.
 
 ```bash
 # Skip hub if already deployed
-DEPLOY_HUB=false ./deploy.sh
+DEPLOY_HUB=false ./agnosticd/deploy.sh
 ```
 
 ### Monitoring Logs
@@ -218,14 +245,14 @@ tail -f ~/Development/agnosticd-v2-output/acmvirt-hub/acmvirt-hub.log
 ### Stop / Start / Status
 
 ```bash
-./stop.sh      # stop all clusters (cost savings)
-./start.sh     # restart stopped clusters
+./agnosticd/stop.sh      # stop all clusters (cost savings)
+./agnosticd/start.sh     # restart stopped clusters
 ```
 
 ### Teardown
 
 ```bash
-./teardown.sh  # destroy all clusters (confirms before proceeding)
+./agnosticd/teardown.sh  # destroy all clusters (confirms before proceeding)
 ```
 
 ## Architecture
