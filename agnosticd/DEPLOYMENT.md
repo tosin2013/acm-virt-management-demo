@@ -255,6 +255,84 @@ tail -f ~/Development/agnosticd-v2-output/acmvirt-hub/acmvirt-hub.log
 ./agnosticd/teardown.sh  # destroy all clusters (confirms before proceeding)
 ```
 
+## Troubleshooting
+
+### OpenShift Installer Timeout (host_ocp4_installer fails after 99 retries)
+
+**Symptoms:**
+```
+[ERROR]: Task failed: Module failed: The command exited with a non-zero return code.
+Origin: .../ansible/roles/host_ocp4_installer/tasks/main.yml:34:7
+    - name: Check installer status
+fatal: ... "attempts": 99, "delta": "8:26:55.827564" ...
+stderr: level=info msg=Consuming Worker Machines from target directory
+```
+
+The OpenShift installer ran for 8+ hours and never completed bootstrap. The cluster
+nodes did not come online.
+
+**Most common causes:**
+
+| Cause | How to verify | Fix |
+|-------|---------------|-----|
+| **AWS vCPU quota insufficient** | Run `./agnosticd/check-quota.sh` | Request quota increase in [AWS Service Quotas](https://console.aws.amazon.com/servicequotas/) |
+| **Instance type unavailable in AZ** | Check AWS console → EC2 → Instance Types → filter by `m5.metal` | Change `AWS_REGION` or use a different AZ |
+| **Base domain DNS not configured** | `dig +short NS yourdomain.com` should return AWS nameservers | Ensure Route53 hosted zone exists and matches `base_domain` |
+| **VPC / EIP / NAT Gateway limit** | AWS console → VPC → check counts | Delete unused VPCs or request limit increase |
+| **Expired or invalid AWS credentials** | `aws sts get-caller-identity` | Refresh credentials in secrets file |
+
+**Debugging steps:**
+
+1. Check the installer log:
+   ```bash
+   cat ~/Development/agnosticd-v2-output/<GUID>/.openshift_install.log | tail -50
+   ```
+
+2. Check AWS CloudFormation stacks (IPI creates stacks):
+   ```bash
+   aws cloudformation list-stacks --region us-east-2 --stack-status-filter CREATE_IN_PROGRESS CREATE_FAILED
+   ```
+
+3. If instances were created but never bootstrapped, check EC2 console for instances
+   in `running` state with the cluster's `InfraID` tag — they may be running but
+   unreachable due to security group or DNS issues.
+
+**Recovery:** After fixing the root cause, teardown the failed attempt and re-deploy:
+```bash
+./agnosticd/teardown.sh
+./agnosticd/deploy.sh
+```
+
+### Execution Environment Image Pull Failure
+
+If `deploy.sh` fails with an error like:
+
+```
+Error: unable to copy from source docker://quay.io/agnosticd/ee-multicloud:chained-YYYY-MM-DD
+Tag chained-YYYY-MM-DD was deleted or has expired
+```
+
+The `chained-*` execution environment (EE) image tags are built on-demand -- not
+daily. Your `ansible-navigator.yml` may reference a tag that doesn't exist yet.
+
+**Fix:** Edit `~/Development/agnosticd-v2/ansible-navigator.yml` and change the
+image tag to a known good value:
+
+```yaml
+ansible-navigator:
+  execution-environment:
+    container-engine: podman
+    image: quay.io/agnosticd/ee-multicloud:chained-latest   # always available
+    pull:
+      policy: missing
+```
+
+Alternatively, list available tags and pick the most recent one:
+
+```bash
+podman search --list-tags quay.io/agnosticd/ee-multicloud | grep chained | sort
+```
+
 ## Architecture
 
 ### Hub Cluster (`acm-virt-hub.yaml`)
@@ -339,36 +417,6 @@ to Microsoft licensing. It must be uploaded once per deployment. The DataVolume 
 `examples/vm-win2019/datavolume-iso.yaml` references the internal service URL
 (`http://httpd-server.httpd-server.svc.cluster.local:8080/files/win2k19.iso`), so the
 ISO must be present before the Windows VM ArgoCD Application can sync successfully.
-
-### Execution Environment Image Pull Failure
-
-If `deploy.sh` fails with an error like:
-
-```
-Error: unable to copy from source docker://quay.io/agnosticd/ee-multicloud:chained-YYYY-MM-DD
-Tag chained-YYYY-MM-DD was deleted or has expired
-```
-
-The `chained-*` execution environment (EE) image tags are built on-demand -- not
-daily. Your `ansible-navigator.yml` may reference a tag that doesn't exist yet.
-
-**Fix:** Edit `~/Development/agnosticd-v2/ansible-navigator.yml` and change the
-image tag to a known good value:
-
-```yaml
-ansible-navigator:
-  execution-environment:
-    container-engine: podman
-    image: quay.io/agnosticd/ee-multicloud:chained-latest   # always available
-    pull:
-      policy: missing
-```
-
-Alternatively, list available tags and pick the most recent one:
-
-```bash
-podman search --list-tags quay.io/agnosticd/ee-multicloud | grep chained | sort
-```
 
 ### Showroom Variable Naming
 
