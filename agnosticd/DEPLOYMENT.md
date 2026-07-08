@@ -117,6 +117,57 @@ base_domain: "sandbox3008.opentlc.com"   # ← replace with YOUR base domain
 > match. If you set `ACCOUNT=mylab`, the secrets file must be `secrets-mylab.yml` and
 > `base_domain` must be your actual domain (e.g., `mylab.example.com`).
 
+## Pre-Deployment Checklist
+
+Before running `deploy.sh`, verify ALL of the following:
+
+### 1. Route53 Hosted Zone Exists
+
+The OpenShift installer **requires** a Route53 hosted zone matching your `base_domain`.
+Without it, the installer will hang indefinitely (8+ hours) trying to validate DNS.
+
+```bash
+# Verify your hosted zone exists
+aws route53 list-hosted-zones --query "HostedZones[?Name=='sandbox3008.opentlc.com.'].Id"
+```
+
+If empty, create one or ensure your `base_domain` value matches an existing hosted zone.
+
+### 2. Pull Secret is Valid
+
+```bash
+# Verify pull secret exists and is valid JSON
+cat ~/pull-secret.json | python3 -m json.tool > /dev/null && echo "OK" || echo "INVALID"
+
+# Check expiry (Red Hat pull secrets expire periodically)
+# Re-download from https://console.redhat.com/openshift/install/pull-secret if needed
+```
+
+### 3. IAM Permissions
+
+The AWS credentials in your secrets file need **full permissions** for:
+EC2, VPC, Route53, ELB/NLB, IAM (instance profiles), S3, and CloudFormation.
+
+```bash
+# Quick sanity check — this must succeed
+aws sts get-caller-identity
+aws ec2 describe-instance-types --instance-types m5.xlarge --query 'InstanceTypes[0].InstanceType'
+```
+
+### 4. Customize `acm-virt-hub.yaml` (Optional but Recommended)
+
+The vars file has some values you should change for your own deployment:
+
+| Line | Setting | Default | Change to |
+|------|---------|---------|-----------|
+| 33 | `owner` tag | `takinosh@redhat.com` | Your email |
+| 42 | `host_ssh_authorized_keys` | `https://github.com/tosin2013.keys` | Your GitHub keys URL or local key |
+| 30 | `aws_region` | `us-east-2` | Your preferred region (must have m5.xlarge + m5zn.metal) |
+
+These are optional — the deployment will work without changing them — but the `owner`
+tag helps identify resources in a shared AWS account, and the SSH key controls who can
+access the bastion.
+
 ## Deployment
 
 The deployment is fully automated through a single script. It provisions the hub
