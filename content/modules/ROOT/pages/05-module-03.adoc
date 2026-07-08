@@ -128,8 +128,8 @@ These metrics power the fleet-wide Grafana dashboards demonstrated in Module 4.
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/policies/vm-right-sizing-policy.yaml
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/policies/placement-binding.yaml
+oc apply -f ~/acm-virt-management-demo/policies/vm-right-sizing-policy.yaml
+oc apply -f ~/acm-virt-management-demo/policies/placement-binding.yaml
 ----
 
 * Open the ACM console at {openshift_console_url} and log in with `{user}` / `{password}` if not already logged in (see xref:02-details.adoc#web-console-login[Logging into the Web Consoles])
@@ -208,7 +208,7 @@ exit
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/policies/vm-backup-enforcement-policy.yaml
+oc apply -f ~/acm-virt-management-demo/policies/vm-backup-enforcement-policy.yaml
 ----
 +
 [NOTE]
@@ -298,8 +298,8 @@ Both policies map to NIST SP 800-53 controls: SC-7 (Boundary Protection) and CM-
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/policies/vm-network-isolation-policy.yaml
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/policies/vm-resource-guardrails-policy.yaml
+oc apply -f ~/acm-virt-management-demo/policies/vm-network-isolation-policy.yaml
+oc apply -f ~/acm-virt-management-demo/policies/vm-resource-guardrails-policy.yaml
 ----
 
 * Verify the policies are Compliant in the ACM console under *Governance* -> *Policies*
@@ -354,8 +354,8 @@ _Additionally, production server VMs rarely need serial console or graphics devi
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/policies/vm-eviction-strategy-policy.yaml
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/policies/vm-security-hardening-policy.yaml
+oc apply -f ~/acm-virt-management-demo/policies/vm-eviction-strategy-policy.yaml
+oc apply -f ~/acm-virt-management-demo/policies/vm-security-hardening-policy.yaml
 ----
 
 * Verify the policies in the ACM console under *Governance* -> *Policies*

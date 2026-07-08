@@ -312,6 +312,24 @@ fi
 echo ""
 
 # -----------------------------------------------------------------
+# Step 2b.2: Clone workshop repo to hub bastion
+#   Students run `oc apply -f ~/acm-virt-management-demo/policies/...`
+#   from the Showroom terminal (which SSH's into the hub bastion).
+# -----------------------------------------------------------------
+if [[ -n "$HUB_BASTION_HOST" && -n "$HUB_BASTION_PASS" ]]; then
+  echo "==> Cloning workshop repo to hub bastion..."
+  sshpass -p "$HUB_BASTION_PASS" ssh -o StrictHostKeyChecking=no "student@${HUB_BASTION_HOST}" bash -s <<'CLONE_EOF'
+if [ ! -d ~/acm-virt-management-demo ]; then
+  git clone https://github.com/tosin2013/acm-virt-management-demo.git ~/acm-virt-management-demo
+else
+  cd ~/acm-virt-management-demo && git pull --ff-only
+fi
+CLONE_EOF
+  echo "   Workshop repo available at ~/acm-virt-management-demo on hub bastion."
+fi
+echo ""
+
+# -----------------------------------------------------------------
 # Step 2c: Deploy HTTP file server on each student cluster
 #   Required for Windows ISO hosting (Module 1 Part 3).
 #   Deploys: namespace, PVC, BuildConfig, Deployment with OAuth proxy,

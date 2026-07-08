@@ -300,7 +300,7 @@ Expected output: `True`
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/components/httpd-fileserver/pipelines/windows-image-pipeline.yaml
+oc apply -f ~/acm-virt-management-demo/components/httpd-fileserver/pipelines/windows-image-pipeline.yaml
 ----
 
 * Verify the pipeline and task were created:
@@ -316,7 +316,7 @@ You should see the `windows-2019-image-build` Pipeline and `windows-apply-manife
 +
 [source,role="execute"]
 ----
-oc create -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/components/httpd-fileserver/pipelines/windows-image-pipelinerun.yaml
+oc create -f ~/acm-virt-management-demo/components/httpd-fileserver/pipelines/windows-image-pipelinerun.yaml
 ----
 
 * Monitor the pipeline progress:

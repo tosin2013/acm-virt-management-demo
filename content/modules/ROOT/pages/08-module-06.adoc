@@ -40,7 +40,7 @@ Expected: no results -- this user has no cluster-wide destructive permissions.
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/rbac/subscription-admin-binding.yaml
+oc apply -f ~/acm-virt-management-demo/rbac/subscription-admin-binding.yaml
 ----
 
 * Verify the binding was created:

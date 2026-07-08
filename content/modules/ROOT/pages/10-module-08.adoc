@@ -95,14 +95,14 @@ _The custom ClusterRole replaces the default superset roles for day-to-day opera
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/rbac/rhacm-nondestructive-operator-clusterrole.yaml
+oc apply -f ~/acm-virt-management-demo/rbac/rhacm-nondestructive-operator-clusterrole.yaml
 ----
 
 * Apply the ValidatingAdmissionPolicy:
 +
 [source,role="execute"]
 ----
-oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/rbac/cluster-destruction-prevention-vap.yaml
+oc apply -f ~/acm-virt-management-demo/rbac/cluster-destruction-prevention-vap.yaml
 ----
 
 * Verify the ClusterRole was created:
