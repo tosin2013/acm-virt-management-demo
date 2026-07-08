@@ -163,7 +163,7 @@ cat observability/vm-custom-alerts.yaml
 +
 [source,role="execute"]
 ----
-oc apply -f observability/vm-custom-alerts.yaml
+oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/observability/vm-custom-alerts.yaml
 ----
 
 * In Grafana, navigate to *Alerting* to verify the alert rules are loaded
@@ -202,7 +202,7 @@ cat observability/vm-grafana-dashboard.yaml
 +
 [source,role="execute"]
 ----
-oc apply -f observability/vm-grafana-dashboard.yaml
+oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/observability/vm-grafana-dashboard.yaml
 ----
 
 * In Grafana, navigate to *Dashboards* → *Custom* and open the *ACM VM Fleet Metrics* dashboard

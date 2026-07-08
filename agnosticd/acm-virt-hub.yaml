@@ -127,6 +127,24 @@ ocp4_workload_showroom_content_git_repo: "https://github.com/tosin2013/acm-virt-
 ocp4_workload_showroom_content_git_repo_ref: main
 ocp4_workload_showroom_terminal_type: showroom
 ocp4_workload_showroom_terminal_image: "quay.io/rhpds/openshift-showroom-terminal-ocp:latest"
+# Pass all custom variables through to Showroom userdata ConfigMap
+ocp4_workload_showroom_user_data_enable_passthrough: true
+ocp4_workload_showroom_user_data:
+  hub_ssh_command: "{{ hub_ssh_command | default('') }}"
+  hub_console_url: "{{ hub_console_url | default('') }}"
+  hub_api_url: "{{ hub_api_url | default('') }}"
+  hub_bastion_hostname: "{{ hub_bastion_hostname | default('') }}"
+  num_students: "{{ num_students | default('1') }}"
+  student_cluster_name: "student-1"
+  grafana_url: "{{ grafana_url | default('') }}"
+  student_1_console_url: "{{ student_1_console_url | default('') }}"
+  student_1_api_url: "{{ student_1_api_url | default('') }}"
+  student_1_bastion_hostname: "{{ student_1_bastion_hostname | default('') }}"
+  student_1_bastion_ssh_user: "{{ student_1_bastion_ssh_user | default('student') }}"
+  student_1_bastion_ssh_password: "{{ student_1_bastion_ssh_password | default('') }}"
+  student_1_ssh_command: "{{ student_1_ssh_command | default('') }}"
+  student_1_admin_password: "{{ student_1_admin_password | default('') }}"
+  student_1_ingress_domain: "{{ student_1_ingress_domain | default('') }}"
 
 # --- RHACM Observability ---
 # Deploys MCO with S3-backed Thanos; S3 bucket is auto-created.

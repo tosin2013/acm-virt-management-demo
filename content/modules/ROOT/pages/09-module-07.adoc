@@ -148,7 +148,7 @@ EOF
 +
 [source,role="execute"]
 ----
-oc apply -f rbac/hub-vm-fleet-view-binding.yaml
+oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/rbac/hub-vm-fleet-view-binding.yaml
 ----
 
 * Review the Placement that selects virtualization-enabled clusters:
@@ -162,7 +162,7 @@ cat rbac/virt-rbac-placement.yaml
 +
 [source,role="execute"]
 ----
-oc apply -f rbac/virt-rbac-placement.yaml
+oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/rbac/virt-rbac-placement.yaml
 ----
 
 * Review the MulticlusterRoleAssignment before applying:
@@ -182,7 +182,7 @@ Note the key elements:
 +
 [source,role="execute"]
 ----
-oc apply -f rbac/multicluster-role-assignment-vm-edit.yaml
+oc apply -f https://raw.githubusercontent.com/tosin2013/acm-virt-management-demo/main/rbac/multicluster-role-assignment-vm-edit.yaml
 ----
 
 * Verify the MRA was created:
