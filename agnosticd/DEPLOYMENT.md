@@ -55,6 +55,40 @@ This creates:
 - `agnosticd-v2-output/` -- deployment logs
 - `agnosticd-v2-virtualenv/` -- Python environment
 
+## Clone This Repository
+
+Clone the workshop repo **inside** the `agnosticd-v2-vars/` directory so `deploy.sh`
+can correctly create symlinks to the vars files:
+
+```bash
+cd ~/Development/agnosticd-v2-vars
+git clone https://github.com/tosin2013/acm-virt-management-demo.git
+```
+
+Your directory structure should look like:
+
+```
+~/Development/
+├── agnosticd-v2/                  # AgnosticD CLI
+├── agnosticd-v2-vars/
+│   ├── acm-virt-management-demo/  # ← this repo (cloned here)
+│   │   ├── agnosticd/
+│   │   │   ├── acm-virt-hub.yaml
+│   │   │   ├── acm-virt-student-sno.yaml
+│   │   │   └── deploy.sh
+│   │   └── ...
+│   ├── acm-virt-hub.yml           # ← symlink (created by deploy.sh)
+│   ├── acm-virt-student-sno.yml   # ← symlink (created by deploy.sh)
+│   └── acm-virt-student.yml       # ← symlink (created by deploy.sh)
+├── agnosticd-v2-secrets/
+└── agnosticd-v2-output/
+```
+
+> **Important:** `deploy.sh` automatically creates the `.yml` symlinks pointing to
+> the `.yaml` files inside the repo. If the symlinks are broken (e.g., `cat` returns
+> "No such file or directory"), delete them and re-run `deploy.sh` — it will recreate
+> them with the correct relative path.
+
 ## Secrets Configuration
 
 Copy your sandbox secrets file:

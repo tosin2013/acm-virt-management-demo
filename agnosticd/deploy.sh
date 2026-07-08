@@ -41,7 +41,13 @@ DEMO_ROOT="${DEMO_ROOT:-$HOME/acm-virt-management-demo}"
 ensure_symlink() {
   local target="$1" link="$2"
   if [[ -L "$link" ]]; then
-    return
+    # Remove stale symlinks that don't resolve
+    if [[ ! -e "$link" ]]; then
+      echo "   Removing broken symlink: $link"
+      rm -f "$link"
+    else
+      return
+    fi
   fi
   if [[ -f "$link" ]]; then
     echo "   Backing up $link -> ${link}.bak"
@@ -52,7 +58,13 @@ ensure_symlink() {
 }
 
 echo "==> Ensuring vars file symlinks (relative for container compatibility)..."
-VARS_SUBDIR="$(basename "$SCRIPT_DIR")"
+# Compute the relative path from VARS_DIR to SCRIPT_DIR (the agnosticd/ subdir of this repo)
+if command -v realpath &>/dev/null; then
+  VARS_SUBDIR="$(realpath --relative-to="$VARS_DIR" "$SCRIPT_DIR")"
+else
+  # Fallback: assume repo is cloned inside VARS_DIR
+  VARS_SUBDIR="$(python3 -c "import os.path; print(os.path.relpath('$SCRIPT_DIR', '$VARS_DIR'))")"
+fi
 ensure_symlink "${VARS_SUBDIR}/acm-virt-hub.yaml" "$VARS_DIR/acm-virt-hub.yml"
 ensure_symlink "${VARS_SUBDIR}/acm-virt-student.yaml" "$VARS_DIR/acm-virt-student.yml"
 ensure_symlink "${VARS_SUBDIR}/acm-virt-student-sno.yaml" "$VARS_DIR/acm-virt-student-sno.yml"
