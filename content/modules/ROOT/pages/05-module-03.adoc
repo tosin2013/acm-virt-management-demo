@@ -220,7 +220,7 @@ oc apply -f ~/acm-virt-management-demo/policies/vm-backup-enforcement-policy.yam
 This policy enforces three components: the OADP Operator subscription, a daily backup schedule, and a DataProtectionApplication (DPA) configuration. The OADP Operator installation takes 2-3 minutes. The backup schedule policy will remain NonCompliant until the Velero CRDs are installed by the operator. The DPA policy uses `remediationAction: inform` because it requires S3 credentials (`cloud-credentials` Secret) that must be provisioned separately.
 ====
 
-* In the ACM console, navigate to *Governance* → *Policies* and locate `vm-backup-enforcement`
+* In the ACM console, navigate to *Governance* → *Policies* and locate `vm-backup-enforcement`. If not already logged in, open `{openshift_console_url}` with `{user}` / `{password}` (see xref:02-details.adoc#web-console-login[Logging into the Web Consoles]).
 
 * Click the policy name to view compliance status per cluster
 
@@ -308,7 +308,7 @@ oc apply -f ~/acm-virt-management-demo/policies/vm-network-isolation-policy.yaml
 oc apply -f ~/acm-virt-management-demo/policies/vm-resource-guardrails-policy.yaml
 ----
 
-* Verify the policies are Compliant in the ACM console under *Governance* -> *Policies*
+* Verify the policies are Compliant in the ACM console. Open the Hub console at `{openshift_console_url}` and log in with `{user}` / `{password}` if not already logged in (see xref:02-details.adoc#web-console-login[Logging into the Web Consoles]). Navigate to *Governance* -> *Policies*:
 
 image::acm-governance-policies-compliant.png[ACM Governance showing Compliant policies]
 
@@ -366,7 +366,7 @@ oc apply -f ~/acm-virt-management-demo/policies/vm-eviction-strategy-policy.yaml
 oc apply -f ~/acm-virt-management-demo/policies/vm-security-hardening-policy.yaml
 ----
 
-* Verify the policies in the ACM console under *Governance* -> *Policies*
+* Verify the policies in the ACM console under *Governance* -> *Policies*. If not already logged in, open `{openshift_console_url}` with `{user}` / `{password}` (see xref:02-details.adoc#web-console-login[Logging into the Web Consoles]).
 +
 [TIP]
 ====
