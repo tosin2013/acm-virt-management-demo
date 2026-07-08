@@ -124,6 +124,8 @@ These metrics power the fleet-wide Grafana dashboards demonstrated in Module 4.
 
 === Show
 
+NOTE: Run the following commands on the *Hub terminal*. If you just returned from the student cluster in Part 1, confirm with `oc whoami --show-server`.
+
 * Apply the VM right-sizing policy and its PlacementBinding:
 +
 [source,role="execute"]
@@ -184,6 +186,8 @@ The policy enforces three layers of backup infrastructure:
 If any of these components are deleted or modified, ACM automatically recreates them.
 
 === Show
+
+NOTE: Start this section on the *Hub terminal*. You will SSH to the student cluster midway through, then return.
 
 * First, create the `openshift-adp` namespace on the managed cluster so the policy can install the OADP Operator:
 +
@@ -294,6 +298,8 @@ Both policies map to NIST SP 800-53 controls: SC-7 (Boundary Protection) and CM-
 
 === Show
 
+NOTE: Run the following commands on the *Hub terminal* (you should already be there from Part 3). If unsure, run `oc whoami --show-server` and confirm it shows the hub API URL.
+
 * Apply the network isolation and resource guardrails policies:
 +
 [source,role="execute"]
@@ -349,6 +355,8 @@ _Additionally, production server VMs rarely need serial console or graphics devi
 **Security Hardening Policy** -- creates a `VirtualMachineClusterPreference` named `hardened-server-vm` that disables serial console and graphics device attachment. Maps to NIST SC-28 (Protection of Information at Rest) and CM-6 (Configuration Settings).
 
 === Show
+
+NOTE: Ensure you are on the *Hub terminal*. If you just returned from the student cluster in Part 4, confirm with `oc whoami --show-server`.
 
 * Apply the eviction strategy and security hardening policies:
 +
