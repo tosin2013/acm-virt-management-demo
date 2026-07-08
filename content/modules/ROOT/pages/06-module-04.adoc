@@ -129,12 +129,28 @@ image::grafana-resource-utilization.png[Grafana Resource Utilization dashboard w
 
 * Check for active right-sizing alerts in the ACM console:
 ** Navigate to *Infrastructure* → *Clusters* → select a managed cluster → *Add-ons*
-** Or query the right-sizing rules from the **Hub terminal** (these are replicated via observability):
+** Or query the right-sizing rules directly on the **student cluster**:
++
+[source,role="execute",subs="attributes+"]
+----
+{student_1_ssh_command}
+----
++
+Password: `{student_1_bastion_ssh_password}`
 +
 [source,role="execute"]
 ----
 oc get prometheusrule vm-right-sizing-rules -n openshift-monitoring -o jsonpath='{.spec.groups[0].rules[?(@.alert)].alert}'
 ----
++
+* Return to the **Hub terminal**:
++
+[source,role="execute"]
+----
+exit
+----
++
+TIP: If `exit` doesn't return you to the Hub prompt, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`)
 
 [IMPORTANT]
 ====
