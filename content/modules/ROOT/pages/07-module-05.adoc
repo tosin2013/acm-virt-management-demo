@@ -222,7 +222,8 @@ Expected output: `1Gi`
 +
 [source,role="execute"]
 ----
-curl -s -o /dev/null -w '%{http_code}' $(oc get vmi fedora-web -n vm-demo-app -o jsonpath='{.status.interfaces[0].ipAddress}'):8080
+oc run curl-test --image=curlimages/curl --restart=Never --rm -i --timeout=15s -n vm-demo-app -- \
+  curl -s -o /dev/null -w '%{http_code}' http://fedora-web.vm-demo-app.svc:80
 echo
 ----
 +
