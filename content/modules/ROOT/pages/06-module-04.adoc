@@ -46,7 +46,9 @@ RHACM deploys the Cluster Monitoring Operator integration that:
 
 NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsure, run `oc whoami` to verify. If disconnected, reconnect with: `{hub_ssh_command}` (password: `{bastion_ssh_password}`). See xref:02-details.adoc#_connecting_to_clusters[Connecting to Clusters] for full details.
 
-* Open Grafana at {grafana_url} -- click *Sign in with OpenShift* and use the Hub credentials (`{user}` / `{password}`). See xref:02-details.adoc#web-console-login[Logging into the Web Consoles] for details.
+* Open Grafana: {grafana_url}[{grafana_url}^]
++
+Click *Sign in with OpenShift* and use the Hub credentials (`{user}` / `{password}`). See xref:02-details.adoc#web-console-login[Logging into the Web Consoles] for details.
 
 * Navigate to *Dashboards* → *OpenShift Virtualization: Cluster Overview*
 
