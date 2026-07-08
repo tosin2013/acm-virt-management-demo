@@ -44,6 +44,32 @@ spec:
 EOF
 ----
 
+* Create the Placement that targets all virtualization-enabled clusters (this Placement is shared by all policies in this module):
++
+[source,role="execute"]
+----
+cat <<'EOF' | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: virt-enabled-clusters
+  namespace: open-cluster-management-policies
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchExpressions:
+            - key: virtualization-enabled
+              operator: In
+              values:
+                - "true"
+            - key: vendor
+              operator: In
+              values:
+                - OpenShift
+EOF
+----
+
 * Create the VM workload namespaces on the managed cluster (the policies in later parts target these namespaces):
 +
 [source,role="execute",subs="attributes+"]
