@@ -174,7 +174,7 @@ The `thanos-ruler-custom-rules` ConfigMap defines two alerts:
 +
 [source,role="execute"]
 ----
-cat observability/vm-custom-alerts.yaml
+cat ~/acm-virt-management-demo/observability/vm-custom-alerts.yaml
 ----
 
 * Apply the custom alert ConfigMap to the observability namespace:
@@ -213,7 +213,7 @@ The `vm-grafana-dashboard` ConfigMap contains a custom Grafana dashboard with fo
 +
 [source,role="execute"]
 ----
-cat observability/vm-grafana-dashboard.yaml
+cat ~/acm-virt-management-demo/observability/vm-grafana-dashboard.yaml
 ----
 
 * Apply the custom dashboard:
