@@ -166,7 +166,24 @@ oc apply -f ~/acm-virt-management-demo/rbac/hub-vm-fleet-view-binding.yaml
 +
 [source,role="execute"]
 ----
-cat rbac/virt-rbac-placement.yaml
+cat ~/acm-virt-management-demo/rbac/virt-rbac-placement.yaml
+----
+
+* Create the `virt-clusters` namespace and bind the ManagedClusterSet (required for the Placement to resolve clusters):
++
+[source,role="execute"]
+----
+oc create namespace virt-clusters --dry-run=client -o yaml | oc apply -f -
+
+cat <<EOF | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: virt-clusters
+  namespace: virt-clusters
+spec:
+  clusterSet: virt-clusters
+EOF
 ----
 
 * Apply the Placement:
@@ -180,7 +197,7 @@ oc apply -f ~/acm-virt-management-demo/rbac/virt-rbac-placement.yaml
 +
 [source,role="execute"]
 ----
-cat rbac/multicluster-role-assignment-vm-edit.yaml
+cat ~/acm-virt-management-demo/rbac/multicluster-role-assignment-vm-edit.yaml
 ----
 +
 Note the key elements:
