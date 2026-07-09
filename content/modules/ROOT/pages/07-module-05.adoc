@@ -96,7 +96,7 @@ oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
   promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_request:5m'
 ----
 +
-You should see entries for both the *fedora-web* and *win2019-install* VMs with their vCPU counts.
+You should see entries for both the *fedora-web* and *win2019-installer* VMs with their vCPU counts.
 
 * Check the memory metrics for both VMs:
 +
@@ -106,7 +106,7 @@ oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
   promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_request:5m'
 ----
 +
-Notice the difference: *fedora-web* requests 4 GiB (a simple httpd server) while *win2019-install* requests 16 GiB (a Windows Server).
+Notice the difference: *fedora-web* requests 4 GiB (a simple httpd server) while *win2019-installer* requests 16 GiB (a Windows Server).
 
 * View the 1-day aggregated recommendations:
 +
@@ -155,7 +155,7 @@ image::right-sizing-vm-detail-overestimation.png[Per-VM detailed view showing ov
 
 * Filter by the `vm-demo-app` namespace and observe both VMs:
 ** *fedora-web* -- running a lightweight httpd service but allocated 1 vCPU and 4 GiB memory. The recommendation shows it needs only ~9 millicores of CPU and ~377 MiB of memory
-** *win2019-install* -- Windows Server 2019 with 4 vCPUs and 16 GiB. Usage will be higher, but still likely over-provisioned for a freshly installed system
+** *win2019-installer* -- Windows Server 2019 with 4 vCPUs and 16 GiB. Usage will be higher, but still likely over-provisioned for a freshly installed system
 
 * Now open the *VM Underestimation* dashboard. If any VMs are using more resources than requested (memory usage exceeding the request), they appear here as candidates for upscaling.
 
@@ -296,29 +296,37 @@ Password: `{student_1_bastion_ssh_password}`
 [source,role="execute"]
 ----
 echo "=== Windows VM Resource Requests ==="
-oc get vm win2019-install -n vm-demo-app -o jsonpath='CPU: {.spec.template.spec.domain.cpu.cores} cores{"\n"}Memory: {.spec.template.spec.domain.resources.requests.memory}{"\n"}'
+oc get vm win2019-installer -n vm-demo-app -o jsonpath='CPU: {.spec.template.spec.domain.cpu.cores} cores{"\n"}Memory: {.spec.template.spec.domain.resources.requests.memory}{"\n"}'
 echo
 echo "=== Windows VM Actual Usage (from recording rules) ==="
 oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
-  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_usage:5m{name="win2019-install"}'
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_usage:5m{name="win2019-installer"}'
 echo
 oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
-  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_usage:5m{name="win2019-install"}'
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_usage:5m{name="win2019-installer"}'
 ----
 
 * Compare the requested vs. actual usage:
 +
 [source,role="execute"]
 ----
-echo "=== Recommendation (with 10% headroom) ==="
+echo "=== Requested Resources ==="
 oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
-  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_recommendation{name="win2019-install"}'
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_request:5m{name="win2019-installer"}'
 echo
 oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
-  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_recommendation{name="win2019-install"}'
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_request:5m{name="win2019-installer"}'
+echo
+echo "=== Usage vs. Request Ratio ==="
+echo "CPU ratio (usage/request):"
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:cpu_usage:5m{name="win2019-installer"} / acm_rs_vm:namespace:cpu_request:5m{name="win2019-installer"}'
+echo "Memory ratio (usage/request):"
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  promtool query instant http://localhost:9090 'acm_rs_vm:namespace:memory_usage:5m{name="win2019-installer"} / acm_rs_vm:namespace:memory_request:5m{name="win2019-installer"}'
 ----
 +
-For a freshly installed Windows Server 2019 that is idle, expect the recommendation to be significantly lower than the 4-core / 16 GiB allocation. In production, Windows VMs running actual workloads would show higher utilization -- the key is measuring before resizing.
+For a freshly installed Windows Server 2019 that is idle, expect a very low CPU ratio (under 0.1 = using less than 10% of allocated) and a memory ratio well below 1.0 (e.g., ~0.08 = using only 1.3 GiB of the 16 GiB allocated). In production, Windows VMs running actual workloads would show higher utilization -- the key is measuring before resizing.
 
 * Return to the **Hub terminal**:
 +
