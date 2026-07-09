@@ -85,6 +85,10 @@ if [[ ! -d "$VARS_DIR" ]]; then
   echo "Run 'make setup' or 'cd $AGNOSTICD_ROOT && ./bin/agd setup' first."
   exit 1
 fi
+# Remove stale symlinks from previous versions before copying
+for f in acm-virt-hub.yml acm-virt-student.yml acm-virt-student-sno.yml; do
+  [[ -L "$VARS_DIR/$f" ]] && rm -f "$VARS_DIR/$f"
+done
 cp "$SCRIPT_DIR/acm-virt-hub.yaml" "$VARS_DIR/acm-virt-hub.yml"
 if [[ -f "$SCRIPT_DIR/acm-virt-student.yaml" ]]; then
   cp "$SCRIPT_DIR/acm-virt-student.yaml" "$VARS_DIR/acm-virt-student.yml"
