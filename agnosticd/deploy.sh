@@ -76,45 +76,20 @@ HUB_GUID="${HUB_GUID:-${BASE_GUID}-hub}"
 DEMO_ROOT="${DEMO_ROOT:-$HOME/acm-virt-management-demo}"
 
 # -----------------------------------------------------------------
-# Pre-flight: ensure vars symlinks exist so agd finds our configs
+# Pre-flight: copy vars files so agd finds our configs inside the
+# container mount (agd mounts VARS_DIR as /vars:Z)
 # -----------------------------------------------------------------
-ensure_symlink() {
-  local target="$1" link="$2"
-  if [[ -L "$link" ]]; then
-    # Remove stale symlinks that don't resolve
-    if [[ ! -e "$link" ]]; then
-      echo "   Removing broken symlink: $link"
-      rm -f "$link"
-    else
-      return
-    fi
-  fi
-  if [[ -f "$link" ]]; then
-    echo "   Backing up $link -> ${link}.bak"
-    mv "$link" "${link}.bak"
-  fi
-  ln -s "$target" "$link"
-  echo "   Symlinked $link -> $target"
-}
-
-echo "==> Ensuring vars file symlinks (relative for container compatibility)..."
+echo "==> Copying vars files to agnosticd-v2-vars..."
 if [[ ! -d "$VARS_DIR" ]]; then
   echo "ERROR: Vars directory not found: $VARS_DIR"
   echo "Run 'make setup' or 'cd $AGNOSTICD_ROOT && ./bin/agd setup' first."
   exit 1
 fi
-# Compute the relative path from VARS_DIR to SCRIPT_DIR (the agnosticd/ subdir of this repo)
-if command -v realpath &>/dev/null; then
-  VARS_SUBDIR="$(realpath --relative-to="$VARS_DIR" "$SCRIPT_DIR")"
-else
-  # Fallback: assume repo is cloned inside VARS_DIR
-  VARS_SUBDIR="$(python3 -c "import os.path; print(os.path.relpath('$SCRIPT_DIR', '$VARS_DIR'))")"
-fi
-ensure_symlink "${VARS_SUBDIR}/acm-virt-hub.yaml" "$VARS_DIR/acm-virt-hub.yml"
+cp "$SCRIPT_DIR/acm-virt-hub.yaml" "$VARS_DIR/acm-virt-hub.yml"
 if [[ -f "$SCRIPT_DIR/acm-virt-student.yaml" ]]; then
-  ensure_symlink "${VARS_SUBDIR}/acm-virt-student.yaml" "$VARS_DIR/acm-virt-student.yml"
+  cp "$SCRIPT_DIR/acm-virt-student.yaml" "$VARS_DIR/acm-virt-student.yml"
 fi
-ensure_symlink "${VARS_SUBDIR}/acm-virt-student-sno.yaml" "$VARS_DIR/acm-virt-student-sno.yml"
+cp "$SCRIPT_DIR/acm-virt-student-sno.yaml" "$VARS_DIR/acm-virt-student-sno.yml"
 echo ""
 
 # -----------------------------------------------------------------
