@@ -439,6 +439,37 @@ print(','.join(str(x) for x in arr)) if isinstance(arr, list) else print('')
     fi
 }
 
+# ─── Load Defaults (for --check-only mode) ───────────────────────────────────
+
+load_defaults() {
+    local output_file
+    output_file="$(manifest_get ".config.output_file")"
+
+    # Load from existing config file first
+    if [[ -n "$output_file" && -f "$output_file" ]]; then
+        while IFS=': ' read -r key value; do
+            key=$(echo "$key" | tr -d ' ')
+            value=$(echo "$value" | sed 's/^[[:space:]]*//' | tr -d '"' | tr -d "'")
+            [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+            if [[ -z "${VARS[$key]+_}" ]]; then
+                VARS["$key"]="${value/#\~/$HOME}"
+            fi
+        done < "$output_file"
+        info "Loaded config from: ${output_file}"
+    fi
+
+    # Fill remaining gaps from manifest defaults
+    local count i key default_val
+    count="$(manifest_len ".config.prompts")"
+    for (( i=0; i<count; i++ )); do
+        key="$(manifest_get ".config.prompts[$i].key")"
+        default_val="$(manifest_get ".config.prompts[$i].default")"
+        if [[ -z "${VARS[$key]+_}" && -n "$default_val" ]]; then
+            VARS["$key"]="${default_val/#\~/$HOME}"
+        fi
+    done
+}
+
 # ─── Phase: Validation + Readiness Gate ──────────────────────────────────────
 
 validate() {
@@ -465,7 +496,7 @@ validate() {
             required_total=$((required_total + 1))
         fi
 
-        if eval "$command" &>/dev/null; then
+        if (set +u; eval "$command") &>/dev/null; then
             pass "${name}"
             if [[ "$required_flag" == "true" ]]; then
                 required_passed=$((required_passed + 1))
@@ -529,6 +560,7 @@ main() {
     info "Manifest: ${MANIFEST}"
 
     if [[ "$CHECK_ONLY" == "true" ]]; then
+        load_defaults
         validate
         local rc=$?
         show_post_setup
