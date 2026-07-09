@@ -17,6 +17,22 @@ A Red Hat Showroom demo covering multicluster governance and virtualization life
 7. **Fine-Grained ACM Permissions** -- MulticlusterRoleAssignment API for scoped kubevirt.io roles
 8. **Eradicate Cluster Destruction** -- Custom RBAC preventing managed cluster deletion
 
+## Getting Started
+
+```bash
+git clone https://github.com/tosin2013/acm-virt-management-demo.git
+cd acm-virt-management-demo
+make setup        # interactive wizard — installs tools, configures deployment
+make deploy       # provision hub + student clusters (1-2 hours)
+```
+
+Or open the project in **Cursor** / **Claude Code** and type `/onboard` for
+AI-assisted setup.
+
+See [agnosticd/QUICKSTART.md](agnosticd/QUICKSTART.md) for the full 5-step
+guide or [agnosticd/DEPLOYMENT.md](agnosticd/DEPLOYMENT.md) for the advanced
+reference.
+
 ## Structure
 
 ```
@@ -26,33 +42,15 @@ rbac/                       RBAC manifests (ClusterRole, MulticlusterRoleAssignm
 right-sizing/               ACM right-sizing policies and Grafana dashboard ConfigMaps
 components/httpd-fileserver/ In-cluster HTTP file server for ISO hosting (OAuth-secured UI)
 ansible/roles/              AgnosticD workload roles for automated deployment
+agnosticd/                  Deployment scripts, onboard manifest, and config templates
 ```
 
 ## Local Preview
 
 ```bash
-# Using the included utilities (recommended)
-./utilities/lab-build    # build the site
-./utilities/lab-serve    # serve at http://localhost:8080
-./utilities/lab-stop     # stop the server
-
-# Or using podman-compose
-podman-compose up
+make docs-build   # build the site
+make docs-serve   # serve at http://localhost:8080
+make docs-stop    # stop the server
 ```
 
 Open http://localhost:8080
-
-## Deployment
-
-See [agnosticd/DEPLOYMENT.md](agnosticd/DEPLOYMENT.md) for full setup instructions.
-
-Quick start (requires AgnosticD v2 + AWS credentials):
-
-```bash
-cd ~/Development/agnosticd-v2-vars/acm-virt-management-demo
-./deploy.sh
-```
-
-## Target Environment
-
-Domain: `.sandbox3008.opentlc.com`
