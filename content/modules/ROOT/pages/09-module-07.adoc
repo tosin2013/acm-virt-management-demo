@@ -21,8 +21,19 @@ NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsur
 +
 [source,role="execute"]
 ----
-oc patch mch multiclusterhub -n open-cluster-management --type=json \
-  -p='[{"op": "add", "path": "/spec/overrides/components/-", "value": {"name": "fine-grained-rbac", "enabled": true}}]'
+INDEX=$(oc get mch multiclusterhub -n open-cluster-management -o jsonpath='{.spec.overrides.components}' | \
+  python3 -c "import sys,json; data=json.load(sys.stdin)
+for i,c in enumerate(data):
+  if c.get('name')=='fine-grained-rbac': print(i); break
+else: print(-1)")
+
+if [[ "$INDEX" == "-1" ]]; then
+  oc patch mch multiclusterhub -n open-cluster-management --type=json \
+    -p='[{"op": "add", "path": "/spec/overrides/components/-", "value": {"name": "fine-grained-rbac", "enabled": true}}]'
+else
+  oc patch mch multiclusterhub -n open-cluster-management --type=json \
+    -p="[{\"op\": \"replace\", \"path\": \"/spec/overrides/components/$INDEX/enabled\", \"value\": true}]"
+fi
 ----
 
 * Verify the component is enabled:
