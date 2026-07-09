@@ -247,6 +247,7 @@ _This is the most visual and compelling part of the module. By logging into the 
 
 * Now open a new **incognito/private browser window** and navigate to the ACM console:
 +
+[subs="attributes+"]
 ----
 {openshift_console_url}
 ----
