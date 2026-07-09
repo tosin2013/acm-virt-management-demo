@@ -231,8 +231,8 @@ substitute_vars() {
         val="${VARS[$key]}"
         text="${text//\$\{${key}\}/${val}}"
     done
-    # Replace any remaining ${var} with <var> so users never see raw template syntax
-    text="$(echo "$text" | sed 's/\${\([^}]*\)}/<\1>/g')"
+    # Replace any remaining ${var} with empty string to avoid shell metacharacter issues
+    text="$(echo "$text" | sed 's/\${[^}]*}//g')"
     echo "$text"
 }
 
@@ -561,8 +561,11 @@ main() {
     info "Detected platform: ${distro}"
     info "Manifest: ${MANIFEST}"
 
+    # Load existing config.yml + manifest defaults so ${var} references
+    # resolve in all phases (setup steps, validation, post-setup).
+    load_defaults
+
     if [[ "$CHECK_ONLY" == "true" ]]; then
-        load_defaults
         validate
         local rc=$?
         show_post_setup
