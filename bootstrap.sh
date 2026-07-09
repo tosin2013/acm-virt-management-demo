@@ -36,6 +36,7 @@ run_msg() { echo -e "  ${BLUE}[RUN]${RESET}     $*"; }
 MODE="prod"
 NON_INTERACTIVE=false
 CHECK_ONLY=false
+NO_DEPLOY=false
 
 usage() {
     cat <<'EOF'
@@ -47,6 +48,7 @@ Options:
   --mode dev|prod    dev = maintainer setup, prod = end-user deploy (default: prod)
   --non-interactive  Accept all defaults without prompting
   --check-only       Run validation checks only
+  --no-deploy        Run setup and validation but skip auto-deploy
   --help             Show this help
 
 EOF
@@ -58,6 +60,7 @@ while [[ $# -gt 0 ]]; do
         --mode)       MODE="${2:-prod}"; shift 2 ;;
         --non-interactive) NON_INTERACTIVE=true; shift ;;
         --check-only) CHECK_ONLY=true; shift ;;
+        --no-deploy) NO_DEPLOY=true; shift ;;
         --help|-h)    usage ;;
         *)            echo "Unknown option: $1"; usage ;;
     esac
@@ -223,6 +226,7 @@ version_gte() {
 # ─── Variable Store ─────────────────────────────────────────────────────────
 
 declare -A VARS
+declare -A VARS_FROM_CONFIG_FILE
 
 substitute_vars() {
     local text="$1"
@@ -411,8 +415,12 @@ print(','.join(str(x) for x in arr)) if isinstance(arr, list) else print('')
 " 2>/dev/null || echo "")"
         fi
 
-        if [[ -z "${VARS[$key]+_}" ]]; then
-            prompt_for "$key" "$prompt_text" "${default_val:-}" "$choices_str" "${required:-false}"
+        if [[ -n "${VARS_FROM_CONFIG_FILE[$key]+_}" ]]; then
+            # User already answered in a previous run — skip
+            ok "${key}: ${VARS[$key]:-}"
+        else
+            # Prompt the user, using manifest default or VARS value as the default
+            prompt_for "$key" "$prompt_text" "${VARS[$key]:-${default_val:-}}" "$choices_str" "${required:-false}"
         fi
     done
 
@@ -447,7 +455,7 @@ load_defaults() {
     local output_file
     output_file="$(manifest_get ".config.output_file")"
 
-    # Load from existing config file first
+    # Load from existing config file first (user already answered these)
     if [[ -n "$output_file" && -f "$output_file" ]]; then
         while IFS=': ' read -r key value; do
             key=$(echo "$key" | tr -d ' ')
@@ -455,6 +463,7 @@ load_defaults() {
             [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
             if [[ -z "${VARS[$key]+_}" ]]; then
                 VARS["$key"]="${value/#\~/$HOME}"
+                VARS_FROM_CONFIG_FILE["$key"]=1
             fi
         done < "$output_file"
         info "Loaded config from: ${output_file}"
@@ -600,7 +609,7 @@ main() {
     show_post_setup
 
     # --- Prod Deploy (only if readiness gate passed) ---
-    if [[ "$MODE" == "prod" && "$validation_passed" == "true" ]]; then
+    if [[ "$MODE" == "prod" && "$validation_passed" == "true" && "$NO_DEPLOY" == "false" ]]; then
         local deploy_cmd
         deploy_cmd="$(manifest_get ".modes.prod.post_validation_command")"
         if [[ -n "$deploy_cmd" ]]; then
@@ -611,7 +620,7 @@ main() {
             info "Running: ${deploy_cmd}"
             eval "$deploy_cmd"
         fi
-    elif [[ "$MODE" == "prod" && "$validation_passed" == "false" ]]; then
+    elif [[ "$MODE" == "prod" && "$validation_passed" == "false" && "$NO_DEPLOY" == "false" ]]; then
         echo ""
         fail "Deployment skipped — resolve all required validation failures first."
         exit 1

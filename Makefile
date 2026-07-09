@@ -1,7 +1,7 @@
 .PHONY: setup setup-dev deploy teardown check check-ready validate docs-build docs-serve docs-stop help
 
 setup: ## Interactive setup wizard (installs tools, configures deployment)
-	./bootstrap.sh
+	./bootstrap.sh --no-deploy
 
 setup-dev: ## Setup for maintainers/contributors (includes linters)
 	./bootstrap.sh --mode dev
