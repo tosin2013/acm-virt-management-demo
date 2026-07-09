@@ -81,7 +81,7 @@ prerequisites:
 
 setup_steps:
   - name: "Clone AgnosticD v2"
-    check: "test -d ${agnosticd_root}/bin/agd"
+    check: "test -x ${agnosticd_root}/bin/agd"
     action: "git clone https://github.com/agnosticd/agnosticd-v2.git ${agnosticd_root}"
     prompt_var: agnosticd_root
     prompt: "AgnosticD v2 install path"
