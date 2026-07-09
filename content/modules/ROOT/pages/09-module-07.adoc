@@ -274,6 +274,8 @@ Log in as:
 ** Username: `vm-operator`
 ** Password: `redhat123`
 
+* After logging in, switch the perspective dropdown (top-left corner) from **"Core platform"** to **"Fleet management"**. The `vm-operator` user does not have permissions on the local Hub cluster's virtualization -- their access is scoped to managed clusters via the fleet view.
+
 * Observe the **restricted view** as the `vm-operator` user:
 ** The *Fleet Virtualization* perspective shows only the clusters and VMs in the `virt-clusters` ManagedClusterSet
 ** The user can see VM status, access the VM console, and view VM metrics
