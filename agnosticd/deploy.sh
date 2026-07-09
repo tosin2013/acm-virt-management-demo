@@ -98,6 +98,11 @@ ensure_symlink() {
 }
 
 echo "==> Ensuring vars file symlinks (relative for container compatibility)..."
+if [[ ! -d "$VARS_DIR" ]]; then
+  echo "ERROR: Vars directory not found: $VARS_DIR"
+  echo "Run 'make setup' or 'cd $AGNOSTICD_ROOT && ./bin/agd setup' first."
+  exit 1
+fi
 # Compute the relative path from VARS_DIR to SCRIPT_DIR (the agnosticd/ subdir of this repo)
 if command -v realpath &>/dev/null; then
   VARS_SUBDIR="$(realpath --relative-to="$VARS_DIR" "$SCRIPT_DIR")"
@@ -106,7 +111,9 @@ else
   VARS_SUBDIR="$(python3 -c "import os.path; print(os.path.relpath('$SCRIPT_DIR', '$VARS_DIR'))")"
 fi
 ensure_symlink "${VARS_SUBDIR}/acm-virt-hub.yaml" "$VARS_DIR/acm-virt-hub.yml"
-ensure_symlink "${VARS_SUBDIR}/acm-virt-student.yaml" "$VARS_DIR/acm-virt-student.yml"
+if [[ -f "$SCRIPT_DIR/acm-virt-student.yaml" ]]; then
+  ensure_symlink "${VARS_SUBDIR}/acm-virt-student.yaml" "$VARS_DIR/acm-virt-student.yml"
+fi
 ensure_symlink "${VARS_SUBDIR}/acm-virt-student-sno.yaml" "$VARS_DIR/acm-virt-student-sno.yml"
 echo ""
 
