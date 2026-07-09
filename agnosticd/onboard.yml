@@ -193,9 +193,9 @@ validation:
     fail_message: "Secrets file not found. Create it from secrets-example.yml."
 
   - name: "Route53 hosted zone"
-    command: "aws route53 list-hosted-zones --query \"HostedZones[?Name=='${base_domain}.']\" --output text | grep -q HOSTED"
+    command: "test -n '${base_domain}' && aws route53 list-hosted-zones --query \"HostedZones[?Name=='${base_domain}.']\" --output text | grep -q HOSTED"
     required: false
-    fail_message: "No Route53 hosted zone found for ${base_domain}. The OpenShift installer requires this."
+    fail_message: "No Route53 hosted zone found for '${base_domain}'. Set base_domain in agnosticd/config.yml or re-run 'make setup'. The OpenShift installer requires a Route53 hosted zone."
 
 # ─────────────────────────────────────────────────────────────
 # Post-Setup Message

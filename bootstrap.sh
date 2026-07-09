@@ -231,6 +231,8 @@ substitute_vars() {
         val="${VARS[$key]}"
         text="${text//\$\{${key}\}/${val}}"
     done
+    # Replace any remaining ${var} with <var> so users never see raw template syntax
+    text="$(echo "$text" | sed 's/\${\([^}]*\)}/<\1>/g')"
     echo "$text"
 }
 
@@ -458,13 +460,13 @@ load_defaults() {
         info "Loaded config from: ${output_file}"
     fi
 
-    # Fill remaining gaps from manifest defaults
+    # Fill remaining gaps from manifest defaults (including empty ones)
     local count i key default_val
     count="$(manifest_len ".config.prompts")"
     for (( i=0; i<count; i++ )); do
         key="$(manifest_get ".config.prompts[$i].key")"
         default_val="$(manifest_get ".config.prompts[$i].default")"
-        if [[ -z "${VARS[$key]+_}" && -n "$default_val" ]]; then
+        if [[ -z "${VARS[$key]+_}" ]]; then
             VARS["$key"]="${default_val/#\~/$HOME}"
         fi
     done
