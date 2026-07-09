@@ -142,11 +142,11 @@ config:
       default: "acmvirt-hub"
 
     - key: owner
-      prompt: "Owner email (AWS resource tag)"
+      prompt: "Owner email for AWS resource tagging (auto-detected from git config)"
       default: ""
 
     - key: ssh_keys_url
-      prompt: "SSH authorized keys URL (e.g., https://github.com/youruser.keys)"
+      prompt: "SSH authorized keys URL (auto-detected from git remote)"
       default: ""
 
     - key: base_domain

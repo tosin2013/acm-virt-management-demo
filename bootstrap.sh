@@ -415,11 +415,9 @@ print(','.join(str(x) for x in arr)) if isinstance(arr, list) else print('')
 " 2>/dev/null || echo "")"
         fi
 
-        if [[ -n "${VARS_FROM_CONFIG_FILE[$key]+_}" ]]; then
-            # User already answered in a previous run — skip
+        if [[ -n "${VARS_FROM_CONFIG_FILE[$key]+_}" && ( -n "${VARS[$key]:-}" || "$required" != "true" ) ]]; then
             ok "${key}: ${VARS[$key]:-}"
         else
-            # Prompt the user, using manifest default or VARS value as the default
             prompt_for "$key" "$prompt_text" "${VARS[$key]:-${default_val:-}}" "$choices_str" "${required:-false}"
         fi
     done
@@ -467,6 +465,25 @@ load_defaults() {
             fi
         done < "$output_file"
         info "Loaded config from: ${output_file}"
+    fi
+
+    # Auto-detect owner from git config
+    if [[ -z "${VARS[owner]+_}" || -z "${VARS[owner]}" ]]; then
+        local git_email
+        git_email="$(git config user.email 2>/dev/null || true)"
+        if [[ -n "$git_email" ]]; then
+            VARS["owner"]="$git_email"
+        fi
+    fi
+
+    # Auto-detect ssh_keys_url from git remote
+    if [[ -z "${VARS[ssh_keys_url]+_}" || -z "${VARS[ssh_keys_url]}" ]]; then
+        local remote_url gh_user
+        remote_url="$(git remote get-url origin 2>/dev/null || true)"
+        gh_user="$(echo "$remote_url" | sed -n 's|.*github\.com[:/]\([^/]*\)/.*|\1|p')"
+        if [[ -n "$gh_user" ]]; then
+            VARS["ssh_keys_url"]="https://github.com/${gh_user}.keys"
+        fi
     fi
 
     # Fill remaining gaps from manifest defaults (including empty ones)
