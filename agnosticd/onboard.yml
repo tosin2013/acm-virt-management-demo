@@ -197,6 +197,11 @@ validation:
     required: false
     fail_message: "No Route53 hosted zone found for '${base_domain}'. Set base_domain in agnosticd/config.yml or re-run 'make setup'. The OpenShift installer requires a Route53 hosted zone."
 
+  - name: "AWS quota (vCPU, VPC, EIP, NLB)"
+    command: "AWS_REGION=${aws_region} NUM_STUDENTS=${num_students} STUDENT_TYPE=${student_type} ./agnosticd/check-quota.sh"
+    required: false
+    fail_message: "AWS quota check failed. Request quota increases in the AWS console for the region above, or reduce num_students."
+
 # ─────────────────────────────────────────────────────────────
 # Post-Setup Message
 # ─────────────────────────────────────────────────────────────
