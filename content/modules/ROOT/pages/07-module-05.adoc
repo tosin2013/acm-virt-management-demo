@@ -369,6 +369,15 @@ Key settings:
 oc patch cm rs-virt-config -n open-cluster-management-observability --type=merge \
   -p '{"data":{"prometheusRuleConfig":"namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 125\n"}}'
 ----
+
+* Verify the patch was applied:
++
+[source,role="execute"]
+----
+oc get cm rs-virt-config -n open-cluster-management-observability -o jsonpath='{.data.prometheusRuleConfig}' | cat
+----
++
+You should see `recommendationPercentage: 125` in the output.
 +
 [NOTE]
 ====
@@ -382,6 +391,15 @@ Changing the `recommendationPercentage` triggers a regeneration of the recording
 oc patch cm rs-virt-config -n open-cluster-management-observability --type=merge \
   -p '{"data":{"prometheusRuleConfig":"namespaceFilterCriteria:\n  inclusionCriteria: []\n  exclusionCriteria:\n  - openshift.*\nlabelFilterCriteria: []\nrecommendationPercentage: 110\n"}}'
 ----
+
+* Confirm the revert:
++
+[source,role="execute"]
+----
+oc get cm rs-virt-config -n open-cluster-management-observability -o jsonpath='{.data.prometheusRuleConfig}' | cat
+----
++
+You should see `recommendationPercentage: 110` again.
 
 == Key Takeaways
 
