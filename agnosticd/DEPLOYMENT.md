@@ -1,5 +1,10 @@
 # AgnosticD Deployment Guide
 
+> **New here?** See [QUICKSTART.md](QUICKSTART.md) for a 5-step setup, or open this
+> project in Cursor / Claude Code and type `/onboard` to have the wizard install
+> prerequisites, configure your deployment, and validate your environment automatically.
+> This guide is the full reference for advanced usage and troubleshooting.
+
 ## Prerequisites
 
 | Requirement | Version | Check |
