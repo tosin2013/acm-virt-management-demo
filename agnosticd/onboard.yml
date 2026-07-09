@@ -93,7 +93,7 @@ setup_steps:
 
   - name: "Scaffold secrets file"
     check: "test -f ${agnosticd_root}/../agnosticd-v2-secrets/secrets-${account}.yml"
-    action: "cp ${agnosticd_root}/../agnosticd-v2-secrets/secrets-example.yml ${agnosticd_root}/../agnosticd-v2-secrets/secrets-${account}.yml"
+    action: "mkdir -p ${agnosticd_root}/../agnosticd-v2-secrets && cp ${agnosticd_root}/../agnosticd-v2-secrets/secrets-sandboxXXX.yml ${agnosticd_root}/../agnosticd-v2-secrets/secrets-${account}.yml 2>/dev/null || printf 'aws_access_key_id: \"\"\\naws_secret_access_key: \"\"\\nbase_domain: \"\"\\n' > ${agnosticd_root}/../agnosticd-v2-secrets/secrets-${account}.yml"
 
 # ─────────────────────────────────────────────────────────────
 # Configuration Prompts
