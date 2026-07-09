@@ -66,14 +66,14 @@ NOTE: Ensure you are on the **Hub terminal** and logged into OpenShift. If unsur
 +
 [source,role="execute"]
 ----
-cat rbac/rhacm-nondestructive-operator-clusterrole.yaml
+cat ~/acm-virt-management-demo/rbac/rhacm-nondestructive-operator-clusterrole.yaml
 ----
 
 * Review the ValidatingAdmissionPolicy that provides the second layer of defense:
 +
 [source,role="execute"]
 ----
-cat rbac/cluster-destruction-prevention-vap.yaml
+cat ~/acm-virt-management-demo/rbac/cluster-destruction-prevention-vap.yaml
 ----
 +
 Note the key design decisions:
