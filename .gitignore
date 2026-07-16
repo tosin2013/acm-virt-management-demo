@@ -4,3 +4,4 @@ node_modules/
 .cache/
 student-info.txt
 agnosticd/config.yml
+presentation/__pycache__/
